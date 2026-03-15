@@ -61,7 +61,7 @@ async def test_summarize_standard_mode(client: OAI):
     print(f"Needs more research: {response.needs_more_research}")
     print(f"\nAnswer:\n{response.content}")
     print(f"\nTokens: {output.usage.total_tokens}")
-    print(f"Latency: {output.latency_ms:.2f}ms")
+    print(f"Duration: {output.latency_ms:.2f}ms")
 
 
 @pytest.mark.asyncio
@@ -86,7 +86,7 @@ async def test_summarize_deep_research_sufficient_context(client: OAI):
     print(f"Needs more research: {response.needs_more_research}")
     print(f"\nContent:\n{response.content}")
     print(f"\nTokens: {output.usage.total_tokens}")
-    print(f"Latency: {output.latency_ms:.2f}ms")
+    print(f"Duration: {output.latency_ms:.2f}ms")
 
 
 INCOMPLETE_SEARCH_CONTEXT = """
@@ -127,7 +127,7 @@ async def test_summarize_deep_research_needs_more(client: OAI):
     print(f"Needs more research: {response.needs_more_research}")
     print(f"\nContent:\n{response.content}")
     print(f"\nTokens: {output.usage.total_tokens}")
-    print(f"Latency: {output.latency_ms:.2f}ms")
+    print(f"Duration: {output.latency_ms:.2f}ms")
 
 
 @pytest.mark.asyncio
@@ -156,4 +156,4 @@ async def test_summarize_deep_research_max_iterations_reached(client: OAI):
     print(f"Needs more research: {response.needs_more_research}")
     print(f"\nContent:\n{response.content}")
     print(f"\nTokens: {output.usage.total_tokens}")
-    print(f"Latency: {output.latency_ms:.2f}ms")
+    print(f"Duration: {output.latency_ms:.2f}ms")

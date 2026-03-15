@@ -9,9 +9,10 @@ from .extractor import extract, format_extracted_content
 from .orchestrator import orchestrate
 from .scrubber import scrub_markdown
 from .search import search_with_output
-from .summarizer import MAX_ITERATIONS, summarize
+from .summarizer import MAX_ITERATIONS, summarize, summarize_stream
 
 StatusCallback = Callable[[str], Awaitable[None]]
+ContentCallback = Callable[[str], Awaitable[None]]
 
 
 async def _direct_response(client: OAI, messages: list[Message]) -> str:
@@ -39,7 +40,7 @@ class Source:
 
 
 class PipelineTimings:
-    """Timing information for pipeline steps."""
+    """Information for pipeline steps."""
 
     def __init__(self):
         self.orchestrate_ms: float = 0
@@ -91,7 +92,7 @@ async def run_search_pipeline(
         oai_client: OAI client instance
         tavily_client: Tavily client instance
         messages: List of conversation messages (will be mutated with assistant response)
-        return_timings: If True, return timing information
+        return_timings: If True, return pipeline metrics
         skip_extraction: If True, skip LLM extraction and pass scrubbed content directly
 
     Returns:
@@ -122,7 +123,10 @@ async def run_search_pipeline(
 
     # Step 2: Execute searches in parallel
     start = time.perf_counter()
-    search_tasks = [search_with_output(tavily_client, query) for query in queries_result.queries]
+    search_tasks = [
+        search_with_output(tavily_client, query, deep_research=False)
+        for query in queries_result.queries
+    ]
     search_results = await asyncio.gather(*search_tasks)
     timings.search_ms = (time.perf_counter() - start) * 1000
 
@@ -199,7 +203,7 @@ async def run_deep_research_pipeline(
         tavily_client: Tavily client instance
         messages: List of conversation messages (will be mutated with assistant response)
         max_iterations: Maximum number of research iterations (default 3)
-        return_timings: If True, return timing information
+        return_timings: If True, return pipeline metrics
 
     Returns:
         PipelineTimings if return_timings is True, else None
@@ -239,10 +243,11 @@ async def run_deep_research_pipeline(
         if not queries_result.queries:
             break
 
-        # Step 2: Execute searches in parallel
+        # Step 2: Execute searches in parallel (advanced depth for deep research)
         start = time.perf_counter()
         search_tasks = [
-            search_with_output(tavily_client, query) for query in queries_result.queries
+            search_with_output(tavily_client, query, deep_research=True)
+            for query in queries_result.queries
         ]
         search_results = await asyncio.gather(*search_tasks)
         timings.search_ms += (time.perf_counter() - start) * 1000
@@ -317,6 +322,7 @@ async def run_search_pipeline_with_status(
     messages: list[Message],
     status_callback: StatusCallback,
     skip_extraction: bool = False,
+    content_callback: ContentCallback | None = None,
 ) -> PipelineTimings:
     """
     Run the standard search pipeline with status updates.
@@ -348,7 +354,10 @@ async def run_search_pipeline_with_status(
     # Step 2: Execute searches in parallel
     await status_callback("Searching the web...")
     start = time.perf_counter()
-    search_tasks = [search_with_output(tavily_client, query) for query in queries_result.queries]
+    search_tasks = [
+        search_with_output(tavily_client, query, deep_research=False)
+        for query in queries_result.queries
+    ]
     search_results = await asyncio.gather(*search_tasks)
     timings.search_ms = (time.perf_counter() - start) * 1000
 
@@ -388,19 +397,32 @@ async def run_search_pipeline_with_status(
         timings.extract_ms = 0
         timings.num_extractions = 0
 
-    # Step 5: Summarize and generate final answer
+    # Step 5: Summarize and generate final answer (stream if content_callback provided)
     await status_callback("Generating response...")
     start = time.perf_counter()
-    summary_response, _ = await summarize(
-        client=oai_client,
-        messages=messages,
-        search_context=context,
-        deep_research=False,
-    )
+    if content_callback is not None:
+        full_content: list[str] = []
+        async for delta in summarize_stream(
+            client=oai_client,
+            messages=messages,
+            search_context=context,
+            num_iterations=1,
+        ):
+            full_content.append(delta)
+            await content_callback(delta)
+        summary_content = "".join(full_content)
+    else:
+        summary_response, _ = await summarize(
+            client=oai_client,
+            messages=messages,
+            search_context=context,
+            deep_research=False,
+        )
+        summary_content = summary_response.content
     timings.summarize_ms = (time.perf_counter() - start) * 1000
 
     # Step 6: Append assistant response to messages
-    messages.append(Message(role="assistant", content=summary_response.content))
+    messages.append(Message(role="assistant", content=summary_content))
 
     timings.total_ms = (time.perf_counter() - total_start) * 1000
 
@@ -413,6 +435,7 @@ async def run_deep_research_pipeline_with_status(
     messages: list[Message],
     status_callback: StatusCallback,
     max_iterations: int = MAX_ITERATIONS,
+    content_callback: ContentCallback | None = None,
 ) -> PipelineTimings:
     """
     Run the deep research pipeline with status updates.
@@ -426,6 +449,7 @@ async def run_deep_research_pipeline_with_status(
 
     while num_iterations < max_iterations:
         num_iterations += 1
+        print(f"Iteration {num_iterations}")
         # Step 1: Generate search queries
         await status_callback("Planning research...")
         start = time.perf_counter()
@@ -451,11 +475,12 @@ async def run_deep_research_pipeline_with_status(
         if not queries_result.queries:
             break
 
-        # Step 2: Execute searches in parallel
+        # Step 2: Execute searches in parallel (advanced depth for deep research)
         await status_callback("Searching the web...")
         start = time.perf_counter()
         search_tasks = [
-            search_with_output(tavily_client, query) for query in queries_result.queries
+            search_with_output(tavily_client, query, deep_research=True)
+            for query in queries_result.queries
         ]
         search_results = await asyncio.gather(*search_tasks)
         timings.search_ms += (time.perf_counter() - start) * 1000
@@ -494,32 +519,58 @@ async def run_deep_research_pipeline_with_status(
 
         context = "\n".join(f"• {fact}" for fact in accumulated_facts)
 
-        # Step 5: Summarize and evaluate
+        # Step 5: Summarize and evaluate (stream only on final iteration when callback provided)
         await status_callback("Synthesizing findings...")
         start = time.perf_counter()
-        summary_response, _ = await summarize(
-            client=oai_client,
-            messages=messages,
-            search_context=context,
-            deep_research=True,
-            num_iterations=num_iterations,
-            max_iterations=max_iterations,
-        )
-        timings.summarize_ms += (time.perf_counter() - start) * 1000
+        is_final_round = num_iterations == max_iterations
+        stream_final = content_callback is not None and is_final_round
 
-        if not summary_response.needs_more_research:
-            break
+        if stream_final:
+            full_content_list: list[str] = []
+            async for delta in summarize_stream(
+                client=oai_client,
+                messages=messages,
+                search_context=context,
+                num_iterations=num_iterations,
+            ):
+                full_content_list.append(delta)
+                await content_callback(delta)
+            summary_content = "".join(full_content_list)
+        else:
+            summary_response, _ = await summarize(
+                client=oai_client,
+                messages=messages,
+                search_context=context,
+                deep_research=True,
+                num_iterations=num_iterations,
+                max_iterations=max_iterations,
+            )
+            summary_content = summary_response.content
+            # Require at least 2 iterations in deep research so we don't stop after one round
+            force_another_round = num_iterations == 1 and max_iterations >= 2
+            if summary_response.needs_more_research or force_another_round:
+                if force_another_round and not summary_response.needs_more_research:
+                    previous_context = f"""=== ACCUMULATED RESEARCH (Iteration {num_iterations}) ===
+{context}
 
-        previous_context = f"""=== ACCUMULATED RESEARCH (Iteration {num_iterations}) ===
+=== FEEDBACK ===
+Run another round of search to deepen coverage. Target any gaps: specific figures (GDP, unemployment, inflation, debt by administration), and main criticisms and defenses from both sides."""
+                else:
+                    previous_context = f"""=== ACCUMULATED RESEARCH (Iteration {num_iterations}) ===
 {context}
 
 === FEEDBACK FROM SUMMARIZER ===
 {summary_response.content}
 
 Please generate new queries to address the missing information above."""
+                timings.summarize_ms += (time.perf_counter() - start) * 1000
+                continue
+
+        timings.summarize_ms += (time.perf_counter() - start) * 1000
+        break
 
     timings.num_iterations = num_iterations
-    messages.append(Message(role="assistant", content=summary_response.content))
+    messages.append(Message(role="assistant", content=summary_content))
     timings.total_ms = (time.perf_counter() - total_start) * 1000
 
     return timings

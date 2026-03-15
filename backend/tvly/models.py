@@ -52,7 +52,7 @@ class SearchOutput(BaseModel):
         default_factory=list, description="Related images (if include_images was enabled)"
     )
     response_time: float = Field(default=0.0, description="API response time in seconds")
-    latency_ms: float = Field(default=0.0, description="Total request latency in milliseconds")
+    latency_ms: float = Field(default=0.0, description="Request duration in milliseconds")
     created_at: datetime = Field(
         default_factory=datetime.now, description="Timestamp when the response was created"
     )

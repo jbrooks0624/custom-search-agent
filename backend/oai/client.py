@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 from .async_chat import chat_async as async_chat
 from .async_chat import chat_async_structured
+from .async_chat import chat_async_stream
 from .config import OAIConfig
 from .models import ChatInput, ChatOutput
 
@@ -105,4 +106,21 @@ class OAI:
             input=input,
             response_model=response_model,
             include_raw=include_raw,
+        )
+
+    def chat_async_stream(
+        self,
+        input: ChatInput,
+        config: OAIConfig | None = None,
+    ):
+        """
+        Asynchronous chat that streams content deltas (no structured output).
+
+        Returns an async iterator of content chunks (str).
+        """
+        effective_config = config or self._config
+        return chat_async_stream(
+            client=self._async_client,
+            config=effective_config,
+            input=input,
         )

@@ -111,12 +111,16 @@ def create_error_event(code: str, message: str, retry_after: int | None = None) 
 
 
 async def generate_chat_stream(request: ChatRequest) -> AsyncGenerator[str, None]:
-    """Generate SSE stream with status updates and final response."""
+    """Generate SSE stream with status updates, streamed answer tokens, and final response."""
     messages = request.messages.copy()
     status_queue: asyncio.Queue[str] = asyncio.Queue()
+    content_queue: asyncio.Queue[str] = asyncio.Queue()
 
     async def status_callback(status: str):
         await status_queue.put(status)
+
+    async def content_callback(delta: str):
+        await content_queue.put(delta)
 
     async def run_pipeline():
         if request.deep_research:
@@ -125,6 +129,7 @@ async def generate_chat_stream(request: ChatRequest) -> AsyncGenerator[str, None
                 tavily_client=tavily_client,
                 messages=messages,
                 status_callback=status_callback,
+                content_callback=content_callback,
             )
         else:
             return await run_search_pipeline_with_status(
@@ -132,20 +137,30 @@ async def generate_chat_stream(request: ChatRequest) -> AsyncGenerator[str, None
                 tavily_client=tavily_client,
                 messages=messages,
                 status_callback=status_callback,
+                content_callback=content_callback,
             )
 
     pipeline_task = asyncio.create_task(run_pipeline())
 
     while not pipeline_task.done():
         try:
-            status = await asyncio.wait_for(status_queue.get(), timeout=0.1)
+            status = await asyncio.wait_for(status_queue.get(), timeout=0.05)
             yield f"data: {json.dumps({'status': status})}\n\n"
         except asyncio.TimeoutError:
-            continue
+            pass
+        try:
+            delta = content_queue.get_nowait()
+            yield f"data: {json.dumps({'content_delta': delta})}\n\n"
+        except asyncio.QueueEmpty:
+            pass
 
     while not status_queue.empty():
         status = await status_queue.get()
         yield f"data: {json.dumps({'status': status})}\n\n"
+
+    while not content_queue.empty():
+        delta = await content_queue.get()
+        yield f"data: {json.dumps({'content_delta': delta})}\n\n"
 
     try:
         timings = pipeline_task.result()
@@ -196,8 +211,8 @@ async def chat(request: ChatRequest):
     """
     Process a chat request and stream status updates.
 
-    Standard mode (~27s): Single-pass RAG with 3 queries
-    Deep research mode (~45-150s): Iterative RAG with up to 3 iterations and 5 queries each
+    Standard mode: Single-pass RAG with 3 queries
+    Deep research mode: Iterative RAG with up to 3 iterations and 5 queries each
     """
     return StreamingResponse(
         generate_chat_stream(request),

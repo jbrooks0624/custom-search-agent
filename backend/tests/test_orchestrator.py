@@ -26,7 +26,7 @@ async def test_orchestrate_standard_simple_query(client: OAI):
     for i, q in enumerate(queries.queries, 1):
         print(f"  {i}. {q}")
     print(f"Tokens: {output.usage.total_tokens}")
-    print(f"Latency: {output.latency_ms:.2f}ms")
+    print(f"Duration: {output.latency_ms:.2f}ms")
 
 
 @pytest.mark.asyncio
@@ -51,7 +51,7 @@ async def test_orchestrate_standard_complex_query(client: OAI):
     for i, q in enumerate(queries.queries, 1):
         print(f"  {i}. {q}")
     print(f"Tokens: {output.usage.total_tokens}")
-    print(f"Latency: {output.latency_ms:.2f}ms")
+    print(f"Duration: {output.latency_ms:.2f}ms")
 
 
 @pytest.mark.asyncio
@@ -76,7 +76,7 @@ async def test_orchestrate_deep_research_multifaceted(client: OAI):
     for i, q in enumerate(queries.queries, 1):
         print(f"  {i}. {q}")
     print(f"Tokens: {output.usage.total_tokens}")
-    print(f"Latency: {output.latency_ms:.2f}ms")
+    print(f"Duration: {output.latency_ms:.2f}ms")
 
 
 @pytest.mark.asyncio
@@ -115,7 +115,7 @@ Missing information:
     for i, q in enumerate(queries.queries, 1):
         print(f"  {i}. {q}")
     print(f"Tokens: {output.usage.total_tokens}")
-    print(f"Latency: {output.latency_ms:.2f}ms")
+    print(f"Duration: {output.latency_ms:.2f}ms")
 
 
 @pytest.mark.asyncio
@@ -140,4 +140,4 @@ async def test_orchestrate_deep_research_technical(client: OAI):
     for i, q in enumerate(queries.queries, 1):
         print(f"  {i}. {q}")
     print(f"Tokens: {output.usage.total_tokens}")
-    print(f"Latency: {output.latency_ms:.2f}ms")
+    print(f"Duration: {output.latency_ms:.2f}ms")

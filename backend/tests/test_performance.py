@@ -1,7 +1,7 @@
 """
 Performance benchmarking tests for search and deep research pipelines.
 
-This module provides detailed timing breakdowns for:
+This module provides detailed breakdowns for:
 - Individual pipeline steps (orchestrate, search, scrub, extract, summarize)
 - Per-operation metrics (time per query, time per source, time per extraction)
 - Concurrent vs sequential performance comparisons
@@ -29,7 +29,7 @@ from workflow.summarizer import summarize
 
 @dataclass
 class StepTiming:
-    """Timing for a single operation."""
+    """Metrics for a single operation."""
 
     name: str
     duration_ms: float
@@ -108,7 +108,7 @@ class TestIndividualStepPerformance:
 
     @pytest.mark.asyncio
     async def test_orchestrator_latency(self, oai_client: OAI):
-        """Measure orchestrator LLM call latency."""
+        """Measure orchestrator LLM call duration."""
         messages = [Message(role="user", content="What is the current state of AI in healthcare?")]
 
         timings = []
@@ -118,7 +118,7 @@ class TestIndividualStepPerformance:
             duration_ms = (time.perf_counter() - start) * 1000
             timings.append(duration_ms)
 
-        print(f"\n--- Orchestrator Latency (3 runs) ---")
+        print(f"\n--- Orchestrator (3 runs) ---")
         print(f"Times: {[f'{t:.0f}ms' for t in timings]}")
         print(f"Mean:  {statistics.mean(timings):.0f}ms")
         print(f"Stdev: {statistics.stdev(timings):.0f}ms")
@@ -131,14 +131,14 @@ class TestIndividualStepPerformance:
 
     @pytest.mark.asyncio
     async def test_search_latency(self, tavily_client: Tavily):
-        """Measure Tavily search API latency."""
+        """Measure Tavily search API duration."""
         queries = [
             "artificial intelligence healthcare 2026",
             "machine learning medical diagnosis",
             "AI drug discovery latest research",
         ]
 
-        print(f"\n--- Search Latency (per query) ---")
+        print(f"\n--- Search (per query) ---")
         timings = []
         for query in queries:
             start = time.perf_counter()
@@ -198,7 +198,7 @@ class TestIndividualStepPerformance:
 
     @pytest.mark.asyncio
     async def test_extractor_latency(self, oai_client: OAI):
-        """Measure extractor LLM call latency."""
+        """Measure extractor LLM call duration."""
         content = """
         # AI in Healthcare: A Comprehensive Overview
 
@@ -222,7 +222,7 @@ class TestIndividualStepPerformance:
             duration_ms = (time.perf_counter() - start) * 1000
             timings.append(duration_ms)
 
-        print(f"\n--- Extractor Latency (3 runs) ---")
+        print(f"\n--- Extractor (3 runs) ---")
         print(f"Times: {[f'{t:.0f}ms' for t in timings]}")
         print(f"Mean:  {statistics.mean(timings):.0f}ms")
 
@@ -243,7 +243,7 @@ class TestIndividualStepPerformance:
 
     @pytest.mark.asyncio
     async def test_summarizer_latency(self, oai_client: OAI):
-        """Measure summarizer LLM call latency."""
+        """Measure summarizer LLM call duration."""
         messages = [Message(role="user", content="What is AI used for in healthcare?")]
         context = """
         - AI diagnostic tools achieve 94% accuracy in cancer detection
@@ -258,7 +258,7 @@ class TestIndividualStepPerformance:
             duration_ms = (time.perf_counter() - start) * 1000
             timings.append(duration_ms)
 
-        print(f"\n--- Summarizer Latency (3 runs) ---")
+        print(f"\n--- Summarizer (3 runs) ---")
         print(f"Times: {[f'{t:.0f}ms' for t in timings]}")
         print(f"Mean:  {statistics.mean(timings):.0f}ms")
 
@@ -268,7 +268,7 @@ class TestPipelinePerformance:
 
     @pytest.mark.asyncio
     async def test_search_pipeline_detailed_timing(self, oai_client: OAI, tavily_client: Tavily):
-        """Get detailed timing breakdown for search pipeline."""
+        """Get detailed breakdown for search pipeline."""
         query = "What are the latest developments in quantum computing?"
         messages = [Message(role="user", content=query)]
 
@@ -323,7 +323,7 @@ class TestPipelinePerformance:
 
     @pytest.mark.asyncio
     async def test_deep_research_pipeline_detailed_timing(self, oai_client: OAI, tavily_client: Tavily):
-        """Get detailed timing breakdown for deep research pipeline."""
+        """Get detailed breakdown for deep research pipeline."""
         query = "Compare the economic policies of recent US administrations with specific GDP and unemployment data"
         messages = [Message(role="user", content=query)]
 
@@ -487,7 +487,7 @@ class TestRegressionBaseline:
     @pytest.mark.asyncio
     async def test_establish_baseline(self, oai_client: OAI, tavily_client: Tavily):
         """
-        Run standard benchmark queries and record timings.
+        Run standard benchmark queries.
         Use this to detect performance regressions.
         """
         benchmarks = [

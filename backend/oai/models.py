@@ -47,7 +47,7 @@ class ChatOutput(BaseModel):
     content: str = Field(description="The response content from the model")
     model: str = Field(description="The model that generated the response")
     usage: TokenUsage = Field(default_factory=TokenUsage, description="Token usage statistics")
-    latency_ms: float = Field(default=0.0, description="Request latency in milliseconds")
+    latency_ms: float = Field(default=0.0, description="Request duration in milliseconds")
     created_at: datetime = Field(
         default_factory=datetime.now, description="Timestamp when the response was created"
     )

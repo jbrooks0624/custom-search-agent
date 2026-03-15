@@ -9,6 +9,7 @@ export interface ChatError {
 
 interface StreamCallbacks {
   onStatus: (status: string) => void
+  onContentDelta: (delta: string) => void
   onComplete: (messages: Message[], sources: { title: string; url: string }[]) => void
   onError: (error: ChatError) => void
 }
@@ -33,6 +34,10 @@ function processSSELine(
 
     if (data.status) {
       callbacks.onStatus(data.status)
+    }
+
+    if (data.content_delta != null) {
+      callbacks.onContentDelta(data.content_delta)
     }
 
     if (data.done) {

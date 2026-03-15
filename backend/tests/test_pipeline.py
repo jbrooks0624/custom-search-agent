@@ -30,7 +30,7 @@ async def test_run_search_pipeline_simple(oai_client: OAI, tavily_client: Tavily
 
     print("\n--- Search Pipeline: Simple Question ---")
     print(f"User: {messages[0].content}")
-    print("\n--- Timings ---")
+    print("\n--- Pipeline metrics ---")
     print(timings)
     print(f"\nAssistant ({len(messages[-1].content)} chars):")
     print(messages[-1].content[:500])
@@ -112,7 +112,7 @@ async def test_run_deep_research_pipeline(oai_client: OAI, tavily_client: Tavily
 
     print("\n--- Deep Research Pipeline ---")
     print(f"User: {messages[0].content}")
-    print("\n--- Timings ---")
+    print("\n--- Pipeline metrics ---")
     print(timings)
     print(f"\nIterations: {timings.num_iterations}")
     print(f"Total queries: {timings.num_queries}")
@@ -151,7 +151,7 @@ async def test_deep_research_multi_iteration(oai_client: OAI, tavily_client: Tav
 1. What are the exact pricing tiers for OpenAI's GPT-5 API vs Anthropic's Claude 4 API (per million tokens)?
 2. What are the specific rate limits for each tier?
 3. Which companies have publicly announced switching from one to the other in 2026, and why?
-4. What are the latency benchmarks from independent testing?""",
+4. What are the performance benchmarks from independent testing?""",
         )
     ]
 
@@ -163,7 +163,7 @@ async def test_deep_research_multi_iteration(oai_client: OAI, tavily_client: Tav
 
     print("\n--- Deep Research (Multi-Part Technical Question) ---")
     print(f"User: {messages[0].content[:200]}...")
-    print("\n--- Timings ---")
+    print("\n--- Pipeline metrics ---")
     print(timings)
     print(f"\nIterations: {timings.num_iterations}")
     print(f"Total queries across iterations: {timings.num_queries}")

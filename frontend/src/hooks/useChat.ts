@@ -28,34 +28,6 @@ export function useChat() {
   const [status, setStatus] = useState('')
   const [lastMessageSources, setLastMessageSources] = useState<Map<number, Source[]>>(new Map())
 
-  const fakeStreamResponse = useCallback((
-    fullContent: string,
-    finalMessages: Message[],
-    sources: Source[]
-  ) => {
-    setIsStreaming(true)
-    setStreamingContent('')
-
-    let charIndex = 0
-    const streamInterval = setInterval(() => {
-      const charsPerTick = Math.floor(Math.random() * 3) + 2
-      charIndex += charsPerTick
-
-      if (charIndex >= fullContent.length) {
-        clearInterval(streamInterval)
-        setIsStreaming(false)
-        setStreamingContent('')
-        setMessages(finalMessages)
-        if (sources.length > 0) {
-          const assistantIndex = finalMessages.length - 1
-          setLastMessageSources(prev => new Map(prev).set(assistantIndex, sources))
-        }
-      } else {
-        setStreamingContent(fullContent.slice(0, charIndex))
-      }
-    }, 10)
-  }, [])
-
   const handleError = useCallback((error: ChatError | Error) => {
     const message = 'code' in error
       ? getErrorMessage(error as ChatError)
@@ -90,16 +62,27 @@ export function useChat() {
     const updatedMessages = [...messages, userMessage]
     setMessages(updatedMessages)
     setIsLoading(true)
+    setIsStreaming(false)
+    setStreamingContent('')
     setStatus('')
 
     try {
       await sendChatMessage(updatedMessages, deepResearch, {
         onStatus: (newStatus) => setStatus(newStatus),
+        onContentDelta: (delta) => {
+          setIsStreaming(true)
+          setStreamingContent(prev => prev + delta)
+        },
         onComplete: (finalMessages, sources) => {
           setIsLoading(false)
+          setIsStreaming(false)
           setStatus('')
-          const fullContent = finalMessages[finalMessages.length - 1].content
-          fakeStreamResponse(fullContent, finalMessages, sources)
+          setStreamingContent('')
+          setMessages(finalMessages)
+          if (sources.length > 0) {
+            const assistantIndex = finalMessages.length - 1
+            setLastMessageSources(prev => new Map(prev).set(assistantIndex, sources))
+          }
         },
         onError: (error) => {
           handleError(error)
@@ -109,7 +92,7 @@ export function useChat() {
       console.error('Error:', error)
       handleError(error as Error)
     }
-  }, [messages, fakeStreamResponse, handleError])
+  }, [messages, handleError])
 
   const resetConversation = useCallback(() => {
     setMessages([])

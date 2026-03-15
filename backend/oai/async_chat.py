@@ -1,4 +1,5 @@
 import time
+from collections.abc import AsyncIterator
 from typing import TypeVar
 
 from openai import AsyncOpenAI
@@ -8,6 +9,8 @@ from .config import OAIConfig
 from .models import ChatInput, ChatOutput, TokenUsage
 
 T = TypeVar("T", bound=BaseModel)
+
+TEXT_DELTA_TYPE = "response.output_text.delta"
 
 
 async def chat_async(
@@ -149,3 +152,37 @@ async def chat_async_structured(
     parsed = response_model.model_validate_json(content)
 
     return parsed, chat_output
+
+
+async def chat_async_stream(
+    client: AsyncOpenAI,
+    config: OAIConfig,
+    input: ChatInput,
+) -> AsyncIterator[str]:
+    """
+    Asynchronous chat completion that streams content deltas.
+
+    Yields only output text deltas (no structured output).
+    """
+    messages = input.to_api_messages()
+
+    api_kwargs = {
+        "model": config.model,
+        "input": messages,
+        "stream": True,
+    }
+
+    if config.temperature is not None:
+        api_kwargs["temperature"] = config.temperature
+
+    if config.max_tokens is not None:
+        api_kwargs["max_output_tokens"] = config.max_tokens
+
+    if config.reasoning_effort is not None:
+        api_kwargs["reasoning"] = {"effort": config.reasoning_effort}
+
+    stream = await client.responses.create(**api_kwargs)
+
+    async for event in stream:
+        if getattr(event, "type", None) == TEXT_DELTA_TYPE and hasattr(event, "delta"):
+            yield event.delta

@@ -23,13 +23,13 @@ async def test_search_async(client: Tavily):
     assert output.has_results, "Should have search results"
     assert len(output.results) <= 3, "Should respect max_results"
     assert output.query == input.query, "Should echo back query"
-    assert output.latency_ms > 0, "Should measure latency"
+    assert output.latency_ms > 0, "Should record duration"
 
     print("\n--- search_async response ---")
     print(f"Query: {output.query}")
     print(f"Results: {len(output.results)}")
     print(f"Response time: {output.response_time:.2f}s")
-    print(f"Latency: {output.latency_ms:.2f}ms")
+    print(f"Duration: {output.latency_ms:.2f}ms")
 
     for i, result in enumerate(output.results, 1):
         print(f"\n{i}. {result.title}")

@@ -19,13 +19,13 @@ async def test_chat_async(client: OAI):
     assert output.content, "Response content should not be empty"
     assert output.model, "Model name should be present"
     assert output.usage.total_tokens > 0, "Should have used some tokens"
-    assert output.latency_ms > 0, "Should have measured latency"
+    assert output.latency_ms > 0, "Should have recorded duration"
 
     print("\n--- chat_async response ---")
     print(f"Content: {output.content}")
     print(f"Model: {output.model}")
     print(f"Tokens: {output.usage.total_tokens}")
-    print(f"Latency: {output.latency_ms:.2f}ms")
+    print(f"Duration: {output.latency_ms:.2f}ms")
 
 
 class Activities(BaseModel):
@@ -55,4 +55,4 @@ async def test_chat_async_structured(client: OAI):
         print(f"  {i}. {activity}")
     print(f"Model: {output.model}")
     print(f"Tokens: {output.usage.total_tokens}")
-    print(f"Latency: {output.latency_ms:.2f}ms")
+    print(f"Duration: {output.latency_ms:.2f}ms")

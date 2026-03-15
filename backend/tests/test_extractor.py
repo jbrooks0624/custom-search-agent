@@ -76,7 +76,7 @@ async def test_extract_relevant_content(client: OAI):
     for fact in result.facts:
         print(f"  • {fact}")
     print(f"Tokens: {output.usage.total_tokens}")
-    print(f"Latency: {output.latency_ms:.2f}ms")
+    print(f"Duration: {output.latency_ms:.2f}ms")
 
 
 @pytest.mark.asyncio
