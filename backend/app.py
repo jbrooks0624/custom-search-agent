@@ -1,7 +1,8 @@
-import os
-import json
 import asyncio
-from typing import AsyncGenerator
+import json
+import logging
+import os
+from collections.abc import AsyncGenerator
 
 from dotenv import load_dotenv
 
@@ -15,11 +16,15 @@ if api_key := os.getenv("tavily_api_key"):
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from openai import APIConnectionError, APIError, RateLimitError
 from pydantic import BaseModel, Field
 
 from oai import OAI, Message
 from tvly import Tavily
-from workflow import run_search_pipeline_with_status, run_deep_research_pipeline_with_status
+from workflow import run_deep_research_pipeline_with_status, run_search_pipeline_with_status
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Search Agent API",
@@ -39,49 +44,58 @@ oai_client = OAI()
 tavily_client = Tavily()
 
 
+class ErrorResponse(BaseModel):
+    """Structured error response."""
+
+    error: bool = True
+    code: str
+    message: str
+    retry_after: int | None = None
+
+
 class ChatRequest(BaseModel):
     """Request payload for the chat endpoint."""
-    messages: list[Message] = Field(
-        description="List of conversation messages"
-    )
+
+    messages: list[Message] = Field(description="List of conversation messages")
     deep_research: bool = Field(
-        default=False,
-        description="If True, use deep research mode with iterative search loops"
+        default=False, description="If True, use deep research mode with iterative search loops"
     )
 
 
 class SourceInfo(BaseModel):
     """Source information."""
+
     title: str
     url: str
 
 
 class ChatResponse(BaseModel):
     """Response payload from the chat endpoint."""
+
     messages: list[Message] = Field(
         description="Updated list of messages including the assistant response"
     )
-    iterations: int = Field(
-        default=1,
-        description="Number of research iterations performed"
-    )
-    total_ms: float = Field(
-        description="Total time taken in milliseconds"
-    )
+    iterations: int = Field(default=1, description="Number of research iterations performed")
+    total_ms: float = Field(description="Total time taken in milliseconds")
     sources: list[SourceInfo] = Field(
-        default_factory=list,
-        description="Sources used in the response"
+        default_factory=list, description="Sources used in the response"
     )
+
+
+def create_error_event(code: str, message: str, retry_after: int | None = None) -> str:
+    """Create an SSE error event."""
+    error = ErrorResponse(code=code, message=message, retry_after=retry_after)
+    return f"data: {json.dumps(error.model_dump())}\n\n"
 
 
 async def generate_chat_stream(request: ChatRequest) -> AsyncGenerator[str, None]:
     """Generate SSE stream with status updates and final response."""
     messages = request.messages.copy()
     status_queue: asyncio.Queue[str] = asyncio.Queue()
-    
+
     async def status_callback(status: str):
         await status_queue.put(status)
-    
+
     async def run_pipeline():
         if request.deep_research:
             return await run_deep_research_pipeline_with_status(
@@ -97,24 +111,55 @@ async def generate_chat_stream(request: ChatRequest) -> AsyncGenerator[str, None
                 messages=messages,
                 status_callback=status_callback,
             )
-    
+
     pipeline_task = asyncio.create_task(run_pipeline())
-    
+
     while not pipeline_task.done():
         try:
             status = await asyncio.wait_for(status_queue.get(), timeout=0.1)
             yield f"data: {json.dumps({'status': status})}\n\n"
         except asyncio.TimeoutError:
             continue
-    
+
     while not status_queue.empty():
         status = await status_queue.get()
         yield f"data: {json.dumps({'status': status})}\n\n"
-    
-    timings = pipeline_task.result()
-    
+
+    try:
+        timings = pipeline_task.result()
+    except RateLimitError as e:
+        logger.error(f"Rate limit exceeded: {e}")
+        retry_after = int(e.response.headers.get("retry-after", 60)) if e.response else 60
+        yield create_error_event(
+            code="rate_limit",
+            message="Rate limit exceeded. Please try again later.",
+            retry_after=retry_after,
+        )
+        return
+    except APIConnectionError as e:
+        logger.error(f"API connection error: {e}")
+        yield create_error_event(
+            code="connection_error",
+            message="Failed to connect to AI service. Please check your connection and try again.",
+        )
+        return
+    except APIError as e:
+        logger.error(f"OpenAI API error: {e}")
+        yield create_error_event(
+            code="api_error",
+            message="AI service error. Please try again.",
+        )
+        return
+    except Exception as e:
+        logger.exception(f"Unexpected error in pipeline: {e}")
+        yield create_error_event(
+            code="internal_error",
+            message="An unexpected error occurred. Please try again.",
+        )
+        return
+
     sources = [SourceInfo(title=s.title, url=s.url) for s in timings.sources] if timings else []
-    
+
     response = ChatResponse(
         messages=messages,
         iterations=timings.num_iterations if timings else 1,
@@ -128,7 +173,7 @@ async def generate_chat_stream(request: ChatRequest) -> AsyncGenerator[str, None
 async def chat(request: ChatRequest):
     """
     Process a chat request and stream status updates.
-    
+
     Standard mode (~27s): Single-pass RAG with 3 queries
     Deep research mode (~45-150s): Iterative RAG with up to 3 iterations and 5 queries each
     """
@@ -138,7 +183,7 @@ async def chat(request: ChatRequest):
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-        }
+        },
     )
 
 

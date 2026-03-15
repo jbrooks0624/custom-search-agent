@@ -1,10 +1,11 @@
 from pydantic import BaseModel, Field
 
-from oai import OAI, OAIConfig, ChatInput, Message, ChatOutput
+from oai import OAI, ChatInput, ChatOutput, Message, OAIConfig
 
 
 class SummarizerResponse(BaseModel):
     """Structured output from the summarizer agent."""
+
     needs_more_research: bool = Field(
         description="True if more research is needed, False if the answer is complete"
     )
@@ -27,7 +28,9 @@ Guidelines:
 5. Structure your response clearly with appropriate formatting"""
 
     if deep_research and can_continue:
-        return base_prompt + """
+        return (
+            base_prompt
+            + """
 
 DEEP RESEARCH MODE: You have the ability to request additional research if the current search results are insufficient to fully answer the user's question.
 
@@ -39,10 +42,14 @@ If you determine that:
 Then set needs_more_research to true and provide specific guidance in your content about what additional information should be searched for. Be specific about the knowledge gaps.
 
 If the search results are sufficient to provide a comprehensive answer, set needs_more_research to false and provide the final answer."""
+        )
     else:
-        return base_prompt + """
+        return (
+            base_prompt
+            + """
 
 Provide the best possible answer based on the available search results. Set needs_more_research to false."""
+        )
 
 
 def _format_summarizer_input(
@@ -52,22 +59,24 @@ def _format_summarizer_input(
 ) -> str:
     """Format the input for the summarizer agent."""
     parts = []
-    
+
     parts.append("=== USER QUESTION ===")
     for msg in messages:
         if msg.role == "user":
             parts.append(msg.content)
-    
+
     parts.append("\n=== SEARCH RESULTS ===")
     parts.append(search_context)
-    
+
     if num_iterations > 1:
-        parts.append(f"\n=== RESEARCH ITERATION ===")
+        parts.append("\n=== RESEARCH ITERATION ===")
         parts.append(f"This is iteration {num_iterations} of the research process.")
-    
+
     parts.append("\n=== TASK ===")
-    parts.append("Analyze the search results and provide a comprehensive answer to the user's question.")
-    
+    parts.append(
+        "Analyze the search results and provide a comprehensive answer to the user's question."
+    )
+
     return "\n".join(parts)
 
 
@@ -81,7 +90,7 @@ async def summarize(
 ) -> tuple[SummarizerResponse, ChatOutput]:
     """
     Summarize search results and either provide final answer or request more research.
-    
+
     Args:
         client: OAI client instance
         messages: Original conversation messages
@@ -89,16 +98,16 @@ async def summarize(
         deep_research: Whether deep research mode is enabled
         num_iterations: Current iteration number (1-indexed)
         max_iterations: Maximum allowed iterations
-    
+
     Returns:
         Tuple of (SummarizerResponse, ChatOutput)
     """
     can_continue = deep_research and num_iterations < max_iterations
-    
-    config = OAIConfig(model="gpt-5-mini", reasoning_effort="low")
-    
+
+    config = OAIConfig(model="gpt-5-nano", reasoning_effort="minimal")
+
     formatted_input = _format_summarizer_input(messages, search_context, num_iterations)
-    
+
     input = ChatInput(
         system_prompt=_get_system_prompt(deep_research, can_continue),
         messages=[Message(role="user", content=formatted_input)],
@@ -109,17 +118,17 @@ async def summarize(
             "can_continue": can_continue,
         },
     )
-    
+
     result, output = await client.chat_async_structured(
         input=input,
         response_model=SummarizerResponse,
         config=config,
     )
-    
+
     if not can_continue and result.needs_more_research:
         result = SummarizerResponse(
             needs_more_research=False,
             content=result.content,
         )
-    
+
     return result, output

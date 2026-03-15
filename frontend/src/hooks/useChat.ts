@@ -1,6 +1,21 @@
 import { useState, useCallback } from 'react'
 import type { Message, Source } from '../types'
-import { sendChatMessage } from '../api/chat'
+import { sendChatMessage, type ChatError } from '../api/chat'
+
+const ERROR_MESSAGES: Record<string, string> = {
+  rate_limit: 'Too many requests. Please wait a moment and try again.',
+  connection_error: 'Unable to connect to the server. Please check your connection.',
+  api_error: 'The AI service encountered an error. Please try again.',
+  internal_error: 'Something went wrong. Please try again.',
+}
+
+function getErrorMessage(error: ChatError): string {
+  const base = ERROR_MESSAGES[error.code] || error.message
+  if (error.retryAfter) {
+    return `${base} (retry in ${error.retryAfter}s)`
+  }
+  return base
+}
 
 export function useChat() {
   const [messages, setMessages] = useState<Message[]>([])
@@ -38,6 +53,20 @@ export function useChat() {
     }, 10)
   }, [])
 
+  const handleError = useCallback((error: ChatError | Error) => {
+    const message = 'code' in error
+      ? getErrorMessage(error as ChatError)
+      : 'Sorry, there was an error processing your request. Please try again.'
+    
+    const errorMessage: Message = {
+      role: 'assistant',
+      content: message,
+    }
+    setMessages(prev => [...prev, errorMessage])
+    setIsLoading(false)
+    setStatus('')
+  }, [])
+
   const submitMessage = useCallback(async (
     content: string,
     deepResearch: boolean
@@ -58,20 +87,14 @@ export function useChat() {
           fakeStreamResponse(fullContent, finalMessages, sources)
         },
         onError: (error) => {
-          throw error
+          handleError(error)
         },
       })
     } catch (error) {
       console.error('Error:', error)
-      const errorMessage: Message = {
-        role: 'assistant',
-        content: 'Sorry, there was an error processing your request. Please try again.',
-      }
-      setMessages(prev => [...prev, errorMessage])
-      setIsLoading(false)
-      setStatus('')
+      handleError(error as Error)
     }
-  }, [messages, fakeStreamResponse])
+  }, [messages, fakeStreamResponse, handleError])
 
   return {
     messages,

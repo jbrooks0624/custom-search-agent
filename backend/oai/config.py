@@ -1,6 +1,6 @@
 from typing import Literal
-from pydantic import BaseModel, Field
 
+from pydantic import BaseModel, Field
 
 ModelName = Literal[
     # GPT-5.4 series (latest flagship)
@@ -28,36 +28,25 @@ ReasoningEffort = Literal[
 
 class OAIConfig(BaseModel):
     """Configuration for OpenAI API calls."""
-    
-    model: ModelName = Field(
-        default="gpt-5-mini",
-        description="The model to use for the API call"
-    )
+
+    model: ModelName = Field(default="gpt-5-mini", description="The model to use for the API call")
     temperature: float | None = Field(
         default=None,
         ge=0.0,
         le=2.0,
-        description="Sampling temperature between 0 and 2 (not supported by GPT-5 models)"
+        description="Sampling temperature between 0 and 2 (not supported by GPT-5 models)",
     )
-    max_tokens: int | None = Field(
-        default=None,
-        gt=0,
-        description="Maximum tokens in the response"
-    )
+    max_tokens: int | None = Field(default=None, gt=0, description="Maximum tokens in the response")
     reasoning_effort: ReasoningEffort | None = Field(
         default=None,
-        description="Reasoning effort level for GPT-5 models (none, minimal, low, medium, high, xhigh)"
+        description="Reasoning effort level for GPT-5 models (none, minimal, low, medium, high, xhigh)",
     )
-    timeout: float = Field(
-        default=60.0,
-        gt=0,
-        description="Request timeout in seconds"
-    )
-    
+    timeout: float = Field(default=60.0, gt=0, description="Request timeout in seconds")
+
     model_config = {
         "frozen": True,
     }
-    
+
     def with_overrides(self, **kwargs) -> "OAIConfig":
         """Create a new config with specified overrides."""
         return self.model_copy(update=kwargs)

@@ -1,11 +1,13 @@
 from typing import TypeVar
-from openai import OpenAI, AsyncOpenAI
+
+from openai import AsyncOpenAI, OpenAI
 from pydantic import BaseModel
 
+from .async_chat import chat_async as async_chat
+from .async_chat import chat_async_structured
 from .config import OAIConfig
 from .models import ChatInput, ChatOutput
 from .sync_chat import chat as sync_chat
-from .async_chat import chat_async as async_chat, chat_async_structured
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -13,26 +15,26 @@ T = TypeVar("T", bound=BaseModel)
 class OAI:
     """
     Main client wrapper for OpenAI API interactions.
-    
+
     Provides a clean interface for synchronous and asynchronous chat
     completions with structured input/output handling.
-    
+
     Example:
         client = OAI(config=OAIConfig(model="gpt-5-mini"))
-        
+
         # Sync chat
         output = client.chat(ChatInput(messages=[...]))
-        
+
         # Async chat
         output = await client.chat_async(ChatInput(messages=[...]))
-        
+
         # Async with structured output
         result, output = await client.chat_async_structured(
             ChatInput(messages=[...]),
             response_model=MySchema
         )
     """
-    
+
     def __init__(
         self,
         config: OAIConfig | None = None,
@@ -40,7 +42,7 @@ class OAI:
     ):
         """
         Initialize the OAI client.
-        
+
         Args:
             config: Default configuration for API calls
             api_key: OpenAI API key (defaults to OPENAI_API_KEY env var)
@@ -48,12 +50,12 @@ class OAI:
         self._config = config or OAIConfig()
         self._sync_client = OpenAI(api_key=api_key)
         self._async_client = AsyncOpenAI(api_key=api_key)
-    
+
     @property
     def config(self) -> OAIConfig:
         """Current default configuration."""
         return self._config
-    
+
     def chat(
         self,
         input: ChatInput,
@@ -62,12 +64,12 @@ class OAI:
     ) -> ChatOutput:
         """
         Synchronous chat completion.
-        
+
         Args:
             input: Structured chat input
             config: Optional config override for this call
             include_raw: Whether to include raw API response
-        
+
         Returns:
             Structured chat output
         """
@@ -78,7 +80,7 @@ class OAI:
             input=input,
             include_raw=include_raw,
         )
-    
+
     async def chat_async(
         self,
         input: ChatInput,
@@ -87,12 +89,12 @@ class OAI:
     ) -> ChatOutput:
         """
         Asynchronous chat completion.
-        
+
         Args:
             input: Structured chat input
             config: Optional config override for this call
             include_raw: Whether to include raw API response
-        
+
         Returns:
             Structured chat output
         """
@@ -103,7 +105,7 @@ class OAI:
             input=input,
             include_raw=include_raw,
         )
-    
+
     async def chat_async_structured(
         self,
         input: ChatInput,
@@ -113,16 +115,16 @@ class OAI:
     ) -> tuple[T, ChatOutput]:
         """
         Asynchronous chat with structured output parsing.
-        
+
         Uses OpenAI's structured output feature to parse the response
         directly into a Pydantic model.
-        
+
         Args:
             input: Structured chat input
             response_model: Pydantic model class for response parsing
             config: Optional config override for this call
             include_raw: Whether to include raw API response
-        
+
         Returns:
             Tuple of (parsed_response, chat_output)
         """
