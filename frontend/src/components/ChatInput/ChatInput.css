@@ -1,0 +1,142 @@
+.chat-input-container {
+  max-width: 800px;
+  width: 100%;
+  padding: 16px 0 24px;
+  background-color: #ffffff;
+  flex-shrink: 0;
+}
+
+.app:not(.started) .chat-input-container {
+  padding-bottom: 0;
+}
+
+.chat-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.chat-input {
+  width: 100%;
+  padding: 16px 100px 16px 20px;
+  font-size: 16px;
+  line-height: 1.5;
+  border: 1px solid #e0e0e0;
+  border-radius: 24px;
+  outline: none;
+  resize: none;
+  font-family: inherit;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+  max-height: 200px;
+  overflow-y: hidden;
+}
+
+.chat-input.scrollable {
+  overflow-y: auto;
+}
+
+.chat-input:focus {
+  border-color: #c0c0c0;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12);
+}
+
+.chat-input::placeholder {
+  color: #999;
+}
+
+.input-buttons {
+  position: absolute;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.deep-research-wrapper {
+  position: relative;
+}
+
+.deep-research-button {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background-color: transparent;
+  color: #999;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s ease, background-color 0.2s ease;
+}
+
+.deep-research-button:hover {
+  background-color: #f0f0f0;
+  color: #666;
+}
+
+.deep-research-button.active {
+  color: #007aff;
+  background-color: transparent;
+}
+
+.deep-research-button.active:hover {
+  background-color: #f0f0f0;
+}
+
+.tooltip {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 8px;
+  padding: 6px 10px;
+  background-color: #333;
+  color: #fff;
+  font-size: 12px;
+  border-radius: 6px;
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+  pointer-events: none;
+}
+
+.tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: #333;
+}
+
+.deep-research-wrapper:hover .tooltip {
+  opacity: 1;
+  visibility: visible;
+}
+
+.submit-button {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background-color: #000;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s ease, opacity 0.2s ease;
+}
+
+.submit-button:hover:not(:disabled) {
+  background-color: #333;
+}
+
+.submit-button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}

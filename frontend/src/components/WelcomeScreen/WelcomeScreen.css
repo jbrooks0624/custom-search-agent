@@ -1,0 +1,62 @@
+.welcome {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.welcome h1 {
+  font-size: 48px;
+  font-weight: 600;
+  color: #111;
+  margin-bottom: 12px;
+}
+
+.welcome .subtitle {
+  font-size: 18px;
+  color: #666;
+}
+
+.starter-questions {
+  margin-top: 40px;
+  display: flex;
+  gap: 32px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.starter-section {
+  text-align: left;
+}
+
+.starter-section h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #999;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+}
+
+.starter-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.starter-button {
+  padding: 8px 12px;
+  background-color: transparent;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #555;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+  max-width: 300px;
+}
+
+.starter-button:hover {
+  background-color: rgba(0, 122, 255, 0.1);
+  color: #007aff;
+  transform: scale(1.03);
+}
