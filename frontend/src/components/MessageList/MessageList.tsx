@@ -27,66 +27,68 @@ export function MessageList({
   }, [messages, streamingContent])
 
   return (
-    <div className="messages-container">
-      {messages.map((message, index) => (
-        <div key={index} className={`message ${message.role}`}>
-          {message.role === 'user' ? (
-            <div
-              className={`message-bubble ${
-                message.content.split('\n').length > 10 || message.content.length > 500
-                  ? 'scrollable'
-                  : ''
-              }`}
-            >
-              {message.content}
+    <div className="messages-scroll-wrapper">
+      <div className="messages-container">
+        {messages.map((message, index) => (
+          <div key={index} className={`message ${message.role}`}>
+            {message.role === 'user' ? (
+              <div
+                className={`message-bubble ${
+                  message.content.split('\n').length > 10 || message.content.length > 500
+                    ? 'scrollable'
+                    : ''
+                }`}
+              >
+                {message.content}
+              </div>
+            ) : (
+              <div className="assistant-content">
+                <ReactMarkdown>{message.content}</ReactMarkdown>
+                {lastMessageSources.get(index) && (
+                  <div className="sources">
+                    <span className="sources-label">Sources:</span>
+                    {lastMessageSources.get(index)!.map((source, i) => (
+                      <a
+                        key={i}
+                        href={source.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="source-link"
+                      >
+                        {source.title}
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
+
+        {isLoading && (
+          <div className="message assistant">
+            <div className="loading-indicator">
+              <div className="loading-dots">
+                <span className="dot"></span>
+                <span className="dot"></span>
+                <span className="dot"></span>
+              </div>
+              {status && <span className="loading-status">{status}</span>}
             </div>
-          ) : (
+          </div>
+        )}
+
+        {isStreaming && (
+          <div className="message assistant">
             <div className="assistant-content">
-              <ReactMarkdown>{message.content}</ReactMarkdown>
-              {lastMessageSources.get(index) && (
-                <div className="sources">
-                  <span className="sources-label">Sources:</span>
-                  {lastMessageSources.get(index)!.map((source, i) => (
-                    <a
-                      key={i}
-                      href={source.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="source-link"
-                    >
-                      {source.title}
-                    </a>
-                  ))}
-                </div>
-              )}
+              <ReactMarkdown>{streamingContent}</ReactMarkdown>
+              <span className="cursor">|</span>
             </div>
-          )}
-        </div>
-      ))}
-
-      {isLoading && (
-        <div className="message assistant">
-          <div className="loading-indicator">
-            <div className="loading-dots">
-              <span className="dot"></span>
-              <span className="dot"></span>
-              <span className="dot"></span>
-            </div>
-            {status && <span className="loading-status">{status}</span>}
           </div>
-        </div>
-      )}
+        )}
 
-      {isStreaming && (
-        <div className="message assistant">
-          <div className="assistant-content">
-            <ReactMarkdown>{streamingContent}</ReactMarkdown>
-            <span className="cursor">|</span>
-          </div>
-        </div>
-      )}
-
-      <div ref={messagesEndRef} />
+        <div ref={messagesEndRef} />
+      </div>
     </div>
   )
 }

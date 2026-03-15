@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import type { KeyboardEvent, ChangeEvent } from 'react'
 import { WelcomeScreen } from './components/WelcomeScreen'
 import { MessageList } from './components/MessageList'
-import { DeepResearchIcon, SendIcon } from './components/Icons'
+import { DeepResearchIcon, SendIcon, NewChatIcon } from './components/Icons'
 import { useChat } from './hooks/useChat'
 import { MAX_HEIGHT } from './constants'
 import './styles/global.css'
@@ -22,6 +22,8 @@ function App() {
     status,
     lastMessageSources,
     submitMessage,
+    resetConversation,
+    isAtMessageLimit,
   } = useChat()
 
   const hasStarted = messages.length > 0
@@ -65,8 +67,24 @@ function App() {
     submitMessage(question, isDeepResearch)
   }
 
+  const handleNewChat = () => {
+    resetConversation()
+    setInput('')
+    setDeepResearch(false)
+  }
+
   return (
     <div className={`app ${hasStarted ? 'started' : ''}`}>
+      {hasStarted && (
+        <header className="app-header">
+          <h1 className="app-title">Search Agent</h1>
+          <button className="new-chat-button" onClick={handleNewChat} title="New Chat">
+            <NewChatIcon />
+            <span>New Chat</span>
+          </button>
+        </header>
+      )}
+
       {!hasStarted && (
         <WelcomeScreen onSelectQuestion={handleStarterQuestion} />
       )}
@@ -83,6 +101,11 @@ function App() {
       )}
 
       <div className="chat-input-container">
+        {isAtMessageLimit && (
+          <div className="message-limit-notice">
+            Conversation limit reached. Please start a new chat.
+          </div>
+        )}
         <div className="chat-input-wrapper">
           <textarea
             ref={textareaRef}
@@ -90,14 +113,16 @@ function App() {
             value={input}
             onChange={handleChange}
             onKeyDown={handleKeyDown}
-            placeholder="Ask anything..."
+            placeholder={isAtMessageLimit ? "Start a new chat to continue..." : "Ask anything..."}
             rows={1}
+            disabled={isAtMessageLimit}
           />
           <div className="input-buttons">
             <div className="deep-research-wrapper">
               <button
                 className={`deep-research-button ${deepResearch ? 'active' : ''}`}
                 onClick={() => setDeepResearch(!deepResearch)}
+                disabled={isAtMessageLimit}
               >
                 <DeepResearchIcon />
               </button>
@@ -106,7 +131,7 @@ function App() {
             <button
               className="submit-button"
               onClick={handleSubmit}
-              disabled={!input.trim() || isLoading}
+              disabled={!input.trim() || isLoading || isAtMessageLimit}
             >
               <SendIcon />
             </button>

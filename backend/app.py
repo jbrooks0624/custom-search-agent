@@ -17,7 +17,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from openai import APIConnectionError, APIError, RateLimitError
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from oai import OAI, Message
 from tvly import Tavily
@@ -53,13 +53,35 @@ class ErrorResponse(BaseModel):
     retry_after: int | None = None
 
 
+MAX_MESSAGE_LENGTH = 10000
+MAX_MESSAGES = 20
+
+
 class ChatRequest(BaseModel):
     """Request payload for the chat endpoint."""
 
-    messages: list[Message] = Field(description="List of conversation messages")
+    messages: list[Message] = Field(
+        description="List of conversation messages",
+        min_length=1,
+        max_length=MAX_MESSAGES,
+    )
     deep_research: bool = Field(
         default=False, description="If True, use deep research mode with iterative search loops"
     )
+
+    @field_validator("messages")
+    @classmethod
+    def validate_messages(cls, messages: list[Message]) -> list[Message]:
+        for i, msg in enumerate(messages):
+            if not msg.content or not msg.content.strip():
+                raise ValueError(f"Message {i + 1} cannot be empty")
+            if len(msg.content) > MAX_MESSAGE_LENGTH:
+                raise ValueError(
+                    f"Message {i + 1} exceeds maximum length of {MAX_MESSAGE_LENGTH} characters"
+                )
+            if msg.role not in ("user", "assistant", "system"):
+                raise ValueError(f"Message {i + 1} has invalid role: {msg.role}")
+        return messages
 
 
 class SourceInfo(BaseModel):

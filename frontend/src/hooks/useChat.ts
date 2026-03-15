@@ -1,12 +1,15 @@
 import { useState, useCallback } from 'react'
 import type { Message, Source } from '../types'
 import { sendChatMessage, type ChatError } from '../api/chat'
+import { MAX_MESSAGES, MAX_MESSAGE_LENGTH } from '../constants'
 
 const ERROR_MESSAGES: Record<string, string> = {
   rate_limit: 'Too many requests. Please wait a moment and try again.',
   connection_error: 'Unable to connect to the server. Please check your connection.',
   api_error: 'The AI service encountered an error. Please try again.',
   internal_error: 'Something went wrong. Please try again.',
+  message_too_long: `Message exceeds maximum length of ${MAX_MESSAGE_LENGTH.toLocaleString()} characters.`,
+  conversation_limit: `Conversation limit reached (${MAX_MESSAGES} messages). Please start a new conversation.`,
 }
 
 function getErrorMessage(error: ChatError): string {
@@ -71,6 +74,18 @@ export function useChat() {
     content: string,
     deepResearch: boolean
   ) => {
+    // Validate message length
+    if (content.length > MAX_MESSAGE_LENGTH) {
+      handleError({ code: 'message_too_long', message: ERROR_MESSAGES.message_too_long })
+      return
+    }
+
+    // Check conversation limit (need room for user message + assistant response)
+    if (messages.length >= MAX_MESSAGES - 1) {
+      handleError({ code: 'conversation_limit', message: ERROR_MESSAGES.conversation_limit })
+      return
+    }
+
     const userMessage: Message = { role: 'user', content }
     const updatedMessages = [...messages, userMessage]
     setMessages(updatedMessages)
@@ -96,6 +111,17 @@ export function useChat() {
     }
   }, [messages, fakeStreamResponse, handleError])
 
+  const resetConversation = useCallback(() => {
+    setMessages([])
+    setIsLoading(false)
+    setIsStreaming(false)
+    setStreamingContent('')
+    setStatus('')
+    setLastMessageSources(new Map())
+  }, [])
+
+  const isAtMessageLimit = messages.length >= MAX_MESSAGES - 1
+
   return {
     messages,
     isLoading,
@@ -104,5 +130,7 @@ export function useChat() {
     status,
     lastMessageSources,
     submitMessage,
+    resetConversation,
+    isAtMessageLimit,
   }
 }
