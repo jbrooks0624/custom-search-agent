@@ -1,5 +1,5 @@
 export const MAX_HEIGHT = 200
-export const API_URL = 'http://localhost:8000'
+export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 export const MAX_MESSAGE_LENGTH = 10000
 export const MAX_MESSAGES = 20
 

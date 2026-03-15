@@ -87,13 +87,11 @@ Iterative search with up to 3 research loops:
 ## Setup
 
 ### Prerequisites
-- Python 3.10+ (3.13 recommended)
-- Node.js 18+
-- [uv](https://github.com/astral-sh/uv) (Python package manager)
+- [Docker](https://docs.docker.com/get-docker/) and Docker Compose
 
 ### Environment Variables
 
-Create `backend/.env`:
+Create a `.env` file in the project root:
 
 ```env
 OPENAI_API_KEY=sk-...
@@ -105,33 +103,20 @@ TAVILY_API_KEY=tvly-...
 | `OPENAI_API_KEY` | OpenAI API key for GPT models | Yes |
 | `TAVILY_API_KEY` | Tavily API key for web search | Yes |
 
-### Backend Setup
+### Run with Docker
 
 ```bash
-cd backend
+# Build and run
+docker-compose up --build
 
-# Install dependencies
-uv sync
-
-# Run development server
-uv run uvicorn app:app --reload --port 8000
+# Or run in background
+docker-compose up -d --build
 ```
 
-The API will be available at `http://localhost:8000`.
+- Frontend: `http://localhost:5173`
+- Backend: `http://localhost:8000`
 
-### Frontend Setup
-
-```bash
-cd frontend
-
-# Install dependencies
-npm install
-
-# Run development server
-npm run dev
-```
-
-The app will be available at `http://localhost:5173`.
+The backend uses a volume mount and runs with `--reload`, so code changes are picked up automatically.
 
 ## API Reference
 
