@@ -4,32 +4,39 @@ from pydantic import BaseModel
 T = TypeVar("T", bound=BaseModel)
 
 
-def _add_additional_properties_false(schema: dict[str, Any]) -> dict[str, Any]:
+def _fix_schema_for_openai(schema: dict[str, Any]) -> dict[str, Any]:
     """
-    Recursively add additionalProperties: false to all object schemas.
-    Required by OpenAI's strict structured output.
+    Recursively fix schema for OpenAI's strict structured output requirements:
+    - Add additionalProperties: false to all object schemas
+    - Ensure all properties are in the required array
+    - Remove default values (not supported in strict mode)
     """
     if schema.get("type") == "object" or "properties" in schema:
         schema["additionalProperties"] = False
-    
-    if "properties" in schema:
-        for prop_schema in schema["properties"].values():
-            _add_additional_properties_false(prop_schema)
+        
+        # Ensure all properties are required (OpenAI strict mode requirement)
+        if "properties" in schema:
+            schema["required"] = list(schema["properties"].keys())
+            
+            # Remove defaults from properties (not supported in strict mode)
+            for prop_schema in schema["properties"].values():
+                prop_schema.pop("default", None)
+                _fix_schema_for_openai(prop_schema)
     
     if "items" in schema:
-        _add_additional_properties_false(schema["items"])
+        _fix_schema_for_openai(schema["items"])
     
     if "$defs" in schema:
         for def_schema in schema["$defs"].values():
-            _add_additional_properties_false(def_schema)
+            _fix_schema_for_openai(def_schema)
     
     if "anyOf" in schema:
         for sub_schema in schema["anyOf"]:
-            _add_additional_properties_false(sub_schema)
+            _fix_schema_for_openai(sub_schema)
     
     if "allOf" in schema:
         for sub_schema in schema["allOf"]:
-            _add_additional_properties_false(sub_schema)
+            _fix_schema_for_openai(sub_schema)
     
     return schema
 
@@ -48,7 +55,7 @@ def create_response_format(model: type[T]) -> dict:
         Dictionary configuration for the 'text' parameter in responses.create()
     """
     schema = model.model_json_schema()
-    schema = _add_additional_properties_false(schema)
+    schema = _fix_schema_for_openai(schema)
     
     return {
         "format": {
