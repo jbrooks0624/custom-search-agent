@@ -7,7 +7,7 @@ from .search import search, search_with_output
 from .summarizer import summarize, SummarizerResponse, MAX_ITERATIONS
 from .scrubber import scrub_markdown, scrub_multiple, get_scrub_stats
 from .extractor import extract, extract_multiple, format_extracted_content, get_extraction_stats, ExtractedContent
-from .pipeline import run_search_pipeline
+from .main import run_search_pipeline, run_deep_research_pipeline, PipelineTimings
 
 __all__ = [
     "orchestrate",
@@ -26,4 +26,6 @@ __all__ = [
     "get_extraction_stats",
     "ExtractedContent",
     "run_search_pipeline",
+    "run_deep_research_pipeline",
+    "PipelineTimings",
 ]
