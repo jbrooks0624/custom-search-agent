@@ -4,70 +4,15 @@ A web search-augmented chatbot with standard and deep research modes. Uses real-
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                                  Frontend                                    │
-│                         React + TypeScript + Vite                           │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐ │
-│  │ WelcomeScreen│  │ MessageList │  │  ChatInput  │  │      useChat       │ │
-│  │             │  │             │  │             │  │   (SSE streaming)   │ │
-│  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────────────┘ │
-└─────────────────────────────────────────────────────────────────────────────┘
-                                      │
-                                      │ SSE /chat
-                                      ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                                  Backend                                     │
-│                              FastAPI + Python                                │
-│                                                                              │
-│  ┌───────────────────────────────────────────────────────────────────────┐  │
-│  │                           Pipeline (workflow/)                         │  │
-│  │                                                                        │  │
-│  │   ┌──────────────┐    ┌──────────────┐    ┌──────────────┐            │  │
-│  │   │ Orchestrator │───▶│    Search    │───▶│   Scrubber   │            │  │
-│  │   │  (gpt-5-nano)│    │   (Tavily)   │    │   (regex)    │            │  │
-│  │   └──────────────┘    └──────────────┘    └──────────────┘            │  │
-│  │          │                   │                   │                     │  │
-│  │          │ generates         │ parallel          │ cleans              │  │
-│  │          │ queries           │ web search        │ HTML/markdown       │  │
-│  │          ▼                   ▼                   ▼                     │  │
-│  │   ┌──────────────┐    ┌──────────────┐    ┌──────────────┐            │  │
-│  │   │  Extractor   │◀───│   Results    │◀───│   Content    │            │  │
-│  │   │  (gpt-5-nano)│    │              │    │              │            │  │
-│  │   └──────────────┘    └──────────────┘    └──────────────┘            │  │
-│  │          │                                                             │  │
-│  │          │ extracts relevant facts                                     │  │
-│  │          ▼                                                             │  │
-│  │   ┌──────────────┐         ┌──────────────────────────────────────┐   │  │
-│  │   │  Summarizer  │────────▶│            Final Response            │   │  │
-│  │   │  (gpt-5-nano)│         │                                      │   │  │
-│  │   └──────────────┘         └──────────────────────────────────────┘   │  │
-│  │          │                                                             │  │
-│  │          │ (deep research only)                                        │  │
-│  │          ▼                                                             │  │
-│  │   ┌──────────────┐                                                     │  │
-│  │   │ Loop if more │                                                     │  │
-│  │   │   research   │──────▶ Back to Orchestrator (up to 3 iterations)   │  │
-│  │   │    needed    │                                                     │  │
-│  │   └──────────────┘                                                     │  │
-│  └───────────────────────────────────────────────────────────────────────┘  │
-│                                                                              │
-│  ┌─────────────────────┐              ┌─────────────────────┐               │
-│  │      oai/           │              │       tvly/         │               │
-│  │  OpenAI Wrapper     │              │   Tavily Wrapper    │               │
-│  │  - Async chat       │              │   - Web search      │               │
-│  │  - Structured output│              │   - Raw content     │               │
-│  └─────────────────────┘              └─────────────────────┘               │
-└─────────────────────────────────────────────────────────────────────────────┘
-                │                                    │
-                ▼                                    ▼
-        ┌──────────────┐                    ┌──────────────┐
-        │  OpenAI API  │                    │  Tavily API  │
-        │   (GPT-5)    │                    │ (Web Search) │
-        └──────────────┘                    └──────────────┘
-```
+**Frontend** — React + TypeScript + Vite. Connects to the backend via SSE for streaming status updates and responses.
 
-## Pipeline Modes
+**Backend** — FastAPI app that runs a search pipeline. Each request flows through: the orchestrator (query generation), Tavily (web search), scrubber (content cleaning), extractor (fact extraction), and summarizer (answer synthesis). All LLM calls use OpenAI; search uses Tavily.
+
+**Pipeline** — Orchestrator turns the user message into search queries. Searches run in parallel. The scrubber strips boilerplate from raw markdown. The extractor runs one LLM call per source (in parallel) to pull relevant facts. The summarizer synthesizes a final answer from those facts. In deep research mode, the summarizer can request another round of search if information is missing.
+
+**External APIs** — OpenAI for all LLM calls (orchestrator, extractor, summarizer). Tavily for web search.
+
+## Modes
 
 ### Standard Search
 Single-pass search pipeline:
@@ -87,7 +32,7 @@ Iterative search with up to 3 research loops:
 ## Setup
 
 ### Prerequisites
-- [Docker](https://docs.docker.com/get-docker/) and Docker Compose
+- [Docker](https://docs.docker.com/get-docker/)
 
 ### Environment Variables
 
