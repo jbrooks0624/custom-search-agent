@@ -1,7 +1,8 @@
 import asyncio
 import time
+from typing import Callable, Awaitable
 
-from oai import OAI, Message
+from oai import OAI, OAIConfig, ChatInput, Message
 from tvly import Tavily
 
 from .orchestrator import orchestrate
@@ -9,6 +10,31 @@ from .search import search_with_output
 from .scrubber import scrub_markdown
 from .extractor import extract, format_extracted_content
 from .summarizer import summarize, MAX_ITERATIONS
+
+StatusCallback = Callable[[str], Awaitable[None]]
+
+
+async def _direct_response(client: OAI, messages: list[Message]) -> str:
+    """Generate a direct response without search when no queries are needed."""
+    config = OAIConfig(model="gpt-5-mini", reasoning_effort="low")
+    
+    chat_input = ChatInput(
+        system_prompt="You are a helpful assistant. Respond naturally to the user's message.",
+        messages=messages,
+    )
+    
+    output = await client.chat_async(input=chat_input, config=config)
+    return output.content
+
+
+class Source:
+    """A source used in the response."""
+    def __init__(self, title: str, url: str):
+        self.title = title
+        self.url = url
+    
+    def to_dict(self):
+        return {"title": self.title, "url": self.url}
 
 
 class PipelineTimings:
@@ -24,6 +50,7 @@ class PipelineTimings:
         self.num_sources: int = 0
         self.num_extractions: int = 0
         self.num_iterations: int = 1
+        self.sources: list[Source] = []
     
     def __repr__(self):
         iterations_str = f" over {self.num_iterations} iterations" if self.num_iterations > 1 else ""
@@ -78,6 +105,16 @@ async def run_search_pipeline(
     )
     timings.orchestrate_ms = (time.perf_counter() - start) * 1000
     timings.num_queries = len(queries_result.queries)
+    
+    # If no queries needed, respond directly
+    if not queries_result.queries:
+        print("No queries needed, responding directly")
+        start = time.perf_counter()
+        response = await _direct_response(oai_client, messages)
+        timings.summarize_ms = (time.perf_counter() - start) * 1000
+        messages.append(Message(role="assistant", content=response))
+        timings.total_ms = (time.perf_counter() - total_start) * 1000
+        return timings if return_timings else None
     
     # Step 2: Execute searches in parallel
     start = time.perf_counter()
@@ -190,6 +227,20 @@ async def run_deep_research_pipeline(
         timings.orchestrate_ms += (time.perf_counter() - start) * 1000
         timings.num_queries += len(queries_result.queries)
         
+        # If no queries needed (first iteration only), respond directly
+        if not queries_result.queries and num_iterations == 1:
+            start = time.perf_counter()
+            response = await _direct_response(oai_client, messages)
+            timings.summarize_ms = (time.perf_counter() - start) * 1000
+            messages.append(Message(role="assistant", content=response))
+            timings.total_ms = (time.perf_counter() - total_start) * 1000
+            print("No queries needed, responding directly")
+            return timings if return_timings else None
+        
+        # If no queries in later iterations, we're done
+        if not queries_result.queries:
+            break
+        
         # Step 2: Execute searches in parallel
         start = time.perf_counter()
         search_tasks = [
@@ -264,3 +315,229 @@ Please generate new queries to address the missing information above."""
     timings.total_ms = (time.perf_counter() - total_start) * 1000
     
     return timings if return_timings else None
+
+
+async def run_search_pipeline_with_status(
+    oai_client: OAI,
+    tavily_client: Tavily,
+    messages: list[Message],
+    status_callback: StatusCallback,
+    skip_extraction: bool = False,
+) -> PipelineTimings:
+    """
+    Run the standard search pipeline with status updates.
+    """
+    timings = PipelineTimings()
+    total_start = time.perf_counter()
+    
+    # Step 1: Generate search queries
+    await status_callback("Planning search...")
+    start = time.perf_counter()
+    queries_result, _ = await orchestrate(
+        client=oai_client,
+        messages=messages,
+        deep_research=False,
+    )
+    timings.orchestrate_ms = (time.perf_counter() - start) * 1000
+    timings.num_queries = len(queries_result.queries)
+    
+    # If no queries needed, respond directly
+    if not queries_result.queries:
+        await status_callback("Generating response...")
+        start = time.perf_counter()
+        response = await _direct_response(oai_client, messages)
+        timings.summarize_ms = (time.perf_counter() - start) * 1000
+        messages.append(Message(role="assistant", content=response))
+        timings.total_ms = (time.perf_counter() - total_start) * 1000
+        return timings
+    
+    # Step 2: Execute searches in parallel
+    await status_callback("Searching the web...")
+    start = time.perf_counter()
+    search_tasks = [
+        search_with_output(tavily_client, query)
+        for query in queries_result.queries
+    ]
+    search_results = await asyncio.gather(*search_tasks)
+    timings.search_ms = (time.perf_counter() - start) * 1000
+    
+    # Step 3: Scrub content and collect sources
+    start = time.perf_counter()
+    all_contents = []
+    seen_urls = set()
+    for markdown, output in search_results:
+        for result in output.results:
+            if result.raw_content:
+                scrubbed = scrub_markdown(result.raw_content)
+                if scrubbed:
+                    all_contents.append(scrubbed)
+                    if result.url and result.url not in seen_urls:
+                        seen_urls.add(result.url)
+                        timings.sources.append(Source(
+                            title=result.title or result.url,
+                            url=result.url
+                        ))
+    timings.scrub_ms = (time.perf_counter() - start) * 1000
+    timings.num_sources = len(all_contents)
+    
+    # Step 4: Extract relevant facts in parallel (or skip)
+    if not skip_extraction:
+        await status_callback("Analyzing sources...")
+        start = time.perf_counter()
+        user_query = next((m.content for m in messages if m.role == "user"), "")
+        
+        extract_tasks = [
+            extract(oai_client, content, user_query)
+            for content in all_contents
+        ]
+        extraction_results = await asyncio.gather(*extract_tasks)
+        timings.extract_ms = (time.perf_counter() - start) * 1000
+        timings.num_extractions = len(extraction_results)
+        
+        extractions = [result for result, _ in extraction_results]
+        context = format_extracted_content(extractions)
+    else:
+        context = "\n\n---\n\n".join(all_contents)
+        timings.extract_ms = 0
+        timings.num_extractions = 0
+    
+    # Step 5: Summarize and generate final answer
+    await status_callback("Generating response...")
+    start = time.perf_counter()
+    summary_response, _ = await summarize(
+        client=oai_client,
+        messages=messages,
+        search_context=context,
+        deep_research=False,
+    )
+    timings.summarize_ms = (time.perf_counter() - start) * 1000
+    
+    # Step 6: Append assistant response to messages
+    messages.append(Message(role="assistant", content=summary_response.content))
+    
+    timings.total_ms = (time.perf_counter() - total_start) * 1000
+    
+    return timings
+
+
+async def run_deep_research_pipeline_with_status(
+    oai_client: OAI,
+    tavily_client: Tavily,
+    messages: list[Message],
+    status_callback: StatusCallback,
+    max_iterations: int = MAX_ITERATIONS,
+) -> PipelineTimings:
+    """
+    Run the deep research pipeline with status updates.
+    """
+    timings = PipelineTimings()
+    total_start = time.perf_counter()
+    
+    num_iterations = 0
+    previous_context: str | None = None
+    accumulated_facts: list[str] = []
+    
+    while num_iterations < max_iterations:
+        num_iterations += 1
+        # Step 1: Generate search queries
+        await status_callback("Planning research...")
+        start = time.perf_counter()
+        queries_result, _ = await orchestrate(
+            client=oai_client,
+            messages=messages,
+            deep_research=True,
+            previous_context=previous_context,
+        )
+        timings.orchestrate_ms += (time.perf_counter() - start) * 1000
+        timings.num_queries += len(queries_result.queries)
+        
+        # If no queries needed (first iteration only), respond directly
+        if not queries_result.queries and num_iterations == 1:
+            await status_callback("Generating response...")
+            start = time.perf_counter()
+            response = await _direct_response(oai_client, messages)
+            timings.summarize_ms = (time.perf_counter() - start) * 1000
+            messages.append(Message(role="assistant", content=response))
+            timings.total_ms = (time.perf_counter() - total_start) * 1000
+            return timings
+        
+        if not queries_result.queries:
+            break
+        
+        # Step 2: Execute searches in parallel
+        await status_callback("Searching the web...")
+        start = time.perf_counter()
+        search_tasks = [
+            search_with_output(tavily_client, query)
+            for query in queries_result.queries
+        ]
+        search_results = await asyncio.gather(*search_tasks)
+        timings.search_ms += (time.perf_counter() - start) * 1000
+        
+        # Step 3: Scrub content and collect sources
+        start = time.perf_counter()
+        all_contents = []
+        seen_urls = {s.url for s in timings.sources}
+        for markdown, output in search_results:
+            for result in output.results:
+                if result.raw_content:
+                    scrubbed = scrub_markdown(result.raw_content)
+                    if scrubbed:
+                        all_contents.append(scrubbed)
+                        if result.url and result.url not in seen_urls:
+                            seen_urls.add(result.url)
+                            timings.sources.append(Source(
+                                title=result.title or result.url,
+                                url=result.url
+                            ))
+        timings.scrub_ms += (time.perf_counter() - start) * 1000
+        timings.num_sources += len(all_contents)
+        
+        # Step 4: Extract relevant facts in parallel
+        await status_callback("Analyzing sources...")
+        start = time.perf_counter()
+        user_query = next((m.content for m in messages if m.role == "user"), "")
+        
+        extract_tasks = [
+            extract(oai_client, content, user_query)
+            for content in all_contents
+        ]
+        extraction_results = await asyncio.gather(*extract_tasks)
+        timings.extract_ms += (time.perf_counter() - start) * 1000
+        timings.num_extractions += len(extraction_results)
+        
+        for extracted, _ in extraction_results:
+            if extracted.relevant and extracted.facts:
+                accumulated_facts.extend(extracted.facts)
+        
+        context = "\n".join(f"• {fact}" for fact in accumulated_facts)
+        
+        # Step 5: Summarize and evaluate
+        await status_callback("Synthesizing findings...")
+        start = time.perf_counter()
+        summary_response, _ = await summarize(
+            client=oai_client,
+            messages=messages,
+            search_context=context,
+            deep_research=True,
+            num_iterations=num_iterations,
+            max_iterations=max_iterations,
+        )
+        timings.summarize_ms += (time.perf_counter() - start) * 1000
+        
+        if not summary_response.needs_more_research:
+            break
+        
+        previous_context = f"""=== ACCUMULATED RESEARCH (Iteration {num_iterations}) ===
+{context}
+
+=== FEEDBACK FROM SUMMARIZER ===
+{summary_response.content}
+
+Please generate new queries to address the missing information above."""
+    
+    timings.num_iterations = num_iterations
+    messages.append(Message(role="assistant", content=summary_response.content))
+    timings.total_ms = (time.perf_counter() - total_start) * 1000
+    
+    return timings

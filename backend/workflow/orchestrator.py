@@ -9,14 +9,20 @@ class SearchQueries(BaseModel):
 
 
 def _get_system_prompt(max_queries: int, deep_research: bool) -> str:
-    base_prompt = f"""You are an expert research planner and query generation agent. Your objective is to analyze the user's prompt and break it down into a highly targeted list of search engine queries necessary to construct a comprehensive, factual answer.
+    base_prompt = f"""You are an expert research planner and query generation agent. Your objective is to analyze the user's prompt and determine if web search is needed, and if so, break it down into a highly targeted list of search engine queries.
 
-Guidelines for generating queries:
+IMPORTANT: Not all queries require web search. Return an EMPTY queries array for:
+- Greetings or casual conversation (e.g., "hello", "how are you", "thanks")
+- Simple math or logic questions you can answer directly
+- Questions about your capabilities
+- General knowledge you're confident about without needing current information
+
+Guidelines for generating queries (when search IS needed):
 1. Maximize Signal: Use specific keywords, entities, and timeframes. Avoid conversational language in the search queries (e.g., instead of "What did Apple announce recently?", use "Apple recent product announcements press release 2026").
 2. Cover Blind Spots: For complex topics, ensure your queries cover different angles (e.g., if asked about a company's performance, query their official earnings report AND critical financial news analysis).
 3. Iterative Context: If you are provided with previous search findings and a list of "missing information," generate queries strictly aimed at filling those specific knowledge gaps without repeating previous searches.
 
-You must return exactly the requested JSON structure containing the array of search queries. Generate between 1 and {max_queries} queries."""
+You must return exactly the requested JSON structure containing the array of search queries. Generate between 0 and {max_queries} queries (0 if no search is needed)."""
 
     if deep_research:
         return base_prompt + f"""
@@ -99,8 +105,8 @@ async def orchestrate(
     class BoundedSearchQueries(BaseModel):
         """Search queries with bounded count."""
         queries: list[str] = Field(
-            description=f"List of 1 to {max_queries} search queries to execute",
-            min_length=1,
+            description=f"List of 0 to {max_queries} search queries to execute (0 if no search needed)",
+            min_length=0,
             max_length=max_queries,
         )
     
