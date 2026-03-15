@@ -65,6 +65,23 @@ export async function sendChatMessage(
   })
 
   if (!response.ok) {
+    if (response.status === 429) {
+      try {
+        const data = await response.json()
+        callbacks.onError({
+          code: data.code ?? 'rate_limit',
+          message: data.message ?? 'Too many requests. Please try again later.',
+          retryAfter: data.retry_after,
+        })
+      } catch {
+        callbacks.onError({
+          code: 'rate_limit',
+          message: 'Too many requests. Please try again later.',
+          retryAfter: parseInt(response.headers.get('Retry-After') ?? '60', 10) || 60,
+        })
+      }
+      return
+    }
     throw new Error('Failed to get response')
   }
 

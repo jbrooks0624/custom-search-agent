@@ -67,7 +67,7 @@ The backend uses a volume mount and runs with `--reload`, so code changes are pi
 
 ### POST /chat
 
-Process a chat request with streaming status updates.
+Process a chat request with streaming status updates. **Rate limited:** 10 requests per minute per client IP (see [Rate limiting](#rate-limiting)).
 
 **Request:**
 ```json
@@ -87,6 +87,21 @@ data: {"status": "Analyzing sources..."}
 data: {"status": "Generating response..."}
 data: {"done": true, "messages": [...], "iterations": 1, "total_ms": 15234, "sources": [...]}
 ```
+
+### Rate limiting
+
+The `/chat` endpoint is rate limited with [SlowAPI](https://github.com/laurentS/slowapi): **10 requests per minute per client IP**. When the limit is exceeded, the API returns `429 Too Many Requests` with a JSON body:
+
+```json
+{
+  "error": true,
+  "code": "rate_limit",
+  "message": "Too many requests. Please try again later.",
+  "retry_after": 60
+}
+```
+
+The `Retry-After` header is also set (in seconds). The frontend surfaces this as the same user-facing message used for upstream (e.g. OpenAI) rate limits. `/health` is not rate limited.
 
 ### GET /health
 

@@ -13,10 +13,13 @@ if api_key := os.getenv("openai_api_key"):
 if api_key := os.getenv("tavily_api_key"):
     os.environ["TAVILY_API_KEY"] = api_key
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from openai import APIConnectionError, APIError, RateLimitError
+from slowapi import Limiter
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 from pydantic import BaseModel, Field, field_validator
 
 from oai import OAI, Message
@@ -31,6 +34,28 @@ app = FastAPI(
     description="RAG-powered search chatbot with standard and deep research modes",
     version="1.0.0",
 )
+
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+
+
+def _rate_limit_handler(_request: Request, _exc: RateLimitExceeded) -> JSONResponse:
+    """Return 429 with our error shape so the frontend can show a consistent message."""
+    retry_after = 60
+    body = {
+        "error": True,
+        "code": "rate_limit",
+        "message": "Too many requests. Please try again later.",
+        "retry_after": retry_after,
+    }
+    return JSONResponse(
+        status_code=429,
+        content=body,
+        headers={"Retry-After": str(retry_after)},
+    )
+
+
+app.add_exception_handler(RateLimitExceeded, _rate_limit_handler)
 
 app.add_middleware(
     CORSMiddleware,
@@ -207,15 +232,17 @@ async def generate_chat_stream(request: ChatRequest) -> AsyncGenerator[str, None
 
 
 @app.post("/chat")
-async def chat(request: ChatRequest):
+@limiter.limit("10/minute")
+async def chat(request: Request, chat_request: ChatRequest):
     """
     Process a chat request and stream status updates.
 
+    Rate limited to 10 requests per minute per client IP.
     Standard mode: Single-pass RAG with 3 queries
     Deep research mode: Iterative RAG with up to 3 iterations and 5 queries each
     """
     return StreamingResponse(
-        generate_chat_stream(request),
+        generate_chat_stream(chat_request),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
