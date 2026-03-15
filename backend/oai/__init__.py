@@ -1,7 +1,7 @@
 """
 OAI - A structured wrapper around the OpenAI Responses API.
 
-Provides clean, type-safe interfaces for chat completions with
+Provides clean, type-safe interfaces for async chat completions with
 Pydantic-based input/output handling.
 
 Example:
@@ -9,7 +9,7 @@ Example:
 
     client = OAI(config=OAIConfig(model="gpt-5-mini"))
 
-    output = client.chat(
+    output = await client.chat_async(
         ChatInput(
             system_prompt="You are a helpful assistant.",
             messages=[Message(role="user", content="Hello!")]
@@ -18,12 +18,6 @@ Example:
 
     print(output.content)
     print(f"Tokens used: {output.usage.total_tokens}")
-
-    # With reasoning effort for complex tasks
-    output = client.chat(
-        ChatInput(messages=[Message(role="user", content="Solve this...")]),
-        config=OAIConfig(model="gpt-5.4", reasoning_effort="high")
-    )
 """
 
 from .client import OAI

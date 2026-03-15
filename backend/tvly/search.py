@@ -1,6 +1,6 @@
 import time
 
-from tavily import AsyncTavilyClient, TavilyClient
+from tavily import AsyncTavilyClient
 
 from .config import TavilyConfig
 from .models import ImageResult, SearchInput, SearchOutput, SearchResult
@@ -69,35 +69,6 @@ def _parse_response(response: dict, latency_ms: float, include_raw: bool) -> Sea
         latency_ms=latency_ms,
         raw_response=response if include_raw else None,
     )
-
-
-def search(
-    client: TavilyClient,
-    config: TavilyConfig,
-    input: SearchInput,
-    include_raw: bool = False,
-) -> SearchOutput:
-    """
-    Synchronous search using the Tavily API.
-
-    Args:
-        client: TavilyClient instance
-        config: Configuration for the search
-        input: Structured search input
-        include_raw: Whether to include raw API response in output
-
-    Returns:
-        Structured search output with results and metadata
-    """
-    kwargs = _build_search_kwargs(config)
-
-    start_time = time.perf_counter()
-    response = client.search(query=input.query, **kwargs)
-    end_time = time.perf_counter()
-
-    latency_ms = (end_time - start_time) * 1000
-
-    return _parse_response(response, latency_ms, include_raw)
 
 
 async def search_async(

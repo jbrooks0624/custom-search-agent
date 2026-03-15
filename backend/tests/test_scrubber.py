@@ -1,7 +1,7 @@
 import pytest
 
 from tvly import SearchInput, Tavily, TavilyConfig
-from workflow import get_scrub_stats, scrub_markdown, scrub_multiple
+from workflow import scrub_markdown
 
 # Sample raw markdown with typical web page noise
 SAMPLE_RAW_MARKDOWN = """
@@ -195,22 +195,6 @@ def test_scrub_simplifies_links():
     assert "](" not in scrubbed
 
 
-def test_scrub_stats():
-    """Test that stats are calculated correctly."""
-    scrubbed = scrub_markdown(SAMPLE_RAW_MARKDOWN, max_chars=None)
-    stats = get_scrub_stats(SAMPLE_RAW_MARKDOWN, scrubbed)
-
-    assert stats["original_chars"] == len(SAMPLE_RAW_MARKDOWN)
-    assert stats["scrubbed_chars"] == len(scrubbed)
-    assert stats["reduction_chars"] == len(SAMPLE_RAW_MARKDOWN) - len(scrubbed)
-    assert stats["reduction_percent"] > 0
-
-    print("\n--- Scrubber Stats (Sample) ---")
-    print(f"Original: {stats['original_chars']} chars")
-    print(f"Scrubbed: {stats['scrubbed_chars']} chars")
-    print(f"Reduction: {stats['reduction_chars']} chars ({stats['reduction_percent']}%)")
-
-
 def test_scrub_truncation():
     """Test that long content is truncated properly."""
     long_content = "This is a sentence. " * 500  # ~10,000 chars
@@ -219,16 +203,6 @@ def test_scrub_truncation():
     assert len(scrubbed) <= 1000
     # Should end at a sentence boundary or with ellipsis
     assert scrubbed.endswith(".") or scrubbed.endswith("...")
-
-
-def test_scrub_multiple():
-    """Test scrubbing multiple contents."""
-    contents = [SAMPLE_RAW_MARKDOWN, SAMPLE_RAW_MARKDOWN]
-    scrubbed_list = scrub_multiple(contents, max_chars_per_source=None)
-
-    assert len(scrubbed_list) == 2
-    assert all("Understanding Large Language Models" in s for s in scrubbed_list)
-    assert all("© 2026" not in s for s in scrubbed_list)
 
 
 @pytest.mark.asyncio
@@ -248,27 +222,11 @@ async def test_scrub_real_search_results():
     print(f"Query: {input.query}")
     print(f"Results: {len(output.results)}")
 
-    total_original = 0
-    total_scrubbed = 0
-
     for i, result in enumerate(output.results, 1):
         if result.raw_content:
             scrubbed = scrub_markdown(result.raw_content, max_chars=4000)
-            stats = get_scrub_stats(result.raw_content, scrubbed)
-
-            total_original += stats["original_chars"]
-            total_scrubbed += stats["scrubbed_chars"]
-
             print(f"\n{i}. {result.title}")
             print(f"   URL: {result.url}")
-            print(f"   Original: {stats['original_chars']} chars")
-            print(f"   Scrubbed: {stats['scrubbed_chars']} chars")
-            print(f"   Reduction: {stats['reduction_percent']}%")
+            print(f"   Original: {len(result.raw_content)} chars")
+            print(f"   Scrubbed: {len(scrubbed)} chars")
             print(f"   Preview: {scrubbed[:200]}...")
-
-    if total_original > 0:
-        total_reduction = (total_original - total_scrubbed) / total_original * 100
-        print("\n--- TOTAL ---")
-        print(f"Original: {total_original} chars")
-        print(f"Scrubbed: {total_scrubbed} chars")
-        print(f"Total reduction: {total_reduction:.1f}%")

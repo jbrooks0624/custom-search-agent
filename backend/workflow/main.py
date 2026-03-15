@@ -7,7 +7,7 @@ from tvly import Tavily
 
 from .extractor import extract, format_extracted_content
 from .orchestrator import orchestrate
-from .scrubber import scrub_markdown, scrub_multiple_parallel
+from .scrubber import scrub_markdown
 from .search import search_with_output
 from .summarizer import MAX_ITERATIONS, summarize
 
@@ -147,7 +147,7 @@ async def run_search_pipeline(
         timings.extract_ms = 0
         timings.num_extractions = 0
     else:
-        user_query = next((m.content for m in messages if m.role == "user"), "")
+        user_query = next((m.content for m in reversed(messages) if m.role == "user"), "")
 
         extract_tasks = [extract(oai_client, content, user_query) for content in all_contents]
         extraction_results = await asyncio.gather(*extract_tasks)
@@ -261,7 +261,7 @@ async def run_deep_research_pipeline(
 
         # Step 4: Extract relevant facts in parallel
         start = time.perf_counter()
-        user_query = next((m.content for m in messages if m.role == "user"), "")
+        user_query = next((m.content for m in reversed(messages) if m.role == "user"), "")
 
         extract_tasks = [extract(oai_client, content, user_query) for content in all_contents]
         extraction_results = await asyncio.gather(*extract_tasks)
@@ -374,7 +374,7 @@ async def run_search_pipeline_with_status(
     if not skip_extraction:
         await status_callback("Analyzing sources...")
         start = time.perf_counter()
-        user_query = next((m.content for m in messages if m.role == "user"), "")
+        user_query = next((m.content for m in reversed(messages) if m.role == "user"), "")
 
         extract_tasks = [extract(oai_client, content, user_query) for content in all_contents]
         extraction_results = await asyncio.gather(*extract_tasks)
@@ -481,7 +481,7 @@ async def run_deep_research_pipeline_with_status(
         # Step 4: Extract relevant facts in parallel
         await status_callback("Analyzing sources...")
         start = time.perf_counter()
-        user_query = next((m.content for m in messages if m.role == "user"), "")
+        user_query = next((m.content for m in reversed(messages) if m.role == "user"), "")
 
         extract_tasks = [extract(oai_client, content, user_query) for content in all_contents]
         extraction_results = await asyncio.gather(*extract_tasks)

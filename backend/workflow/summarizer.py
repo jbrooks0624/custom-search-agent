@@ -60,10 +60,11 @@ def _format_summarizer_input(
     """Format the input for the summarizer agent."""
     parts = []
 
-    parts.append("=== USER QUESTION ===")
+    # Include full conversation
+    parts.append("=== CONVERSATION ===")
     for msg in messages:
-        if msg.role == "user":
-            parts.append(msg.content)
+        role = "User" if msg.role == "user" else "Assistant"
+        parts.append(f"{role}: {msg.content}")
 
     parts.append("\n=== SEARCH RESULTS ===")
     parts.append(search_context)
@@ -71,11 +72,6 @@ def _format_summarizer_input(
     if num_iterations > 1:
         parts.append("\n=== RESEARCH ITERATION ===")
         parts.append(f"This is iteration {num_iterations} of the research process.")
-
-    parts.append("\n=== TASK ===")
-    parts.append(
-        "Analyze the search results and provide a comprehensive answer to the user's question."
-    )
 
     return "\n".join(parts)
 

@@ -1,29 +1,25 @@
 from typing import TypeVar
 
-from openai import AsyncOpenAI, OpenAI
+from openai import AsyncOpenAI
 from pydantic import BaseModel
 
 from .async_chat import chat_async as async_chat
 from .async_chat import chat_async_structured
 from .config import OAIConfig
 from .models import ChatInput, ChatOutput
-from .sync_chat import chat as sync_chat
 
 T = TypeVar("T", bound=BaseModel)
 
 
 class OAI:
     """
-    Main client wrapper for OpenAI API interactions.
+    Client wrapper for OpenAI API interactions.
 
-    Provides a clean interface for synchronous and asynchronous chat
-    completions with structured input/output handling.
+    Provides a clean interface for asynchronous chat completions
+    with structured input/output handling.
 
     Example:
         client = OAI(config=OAIConfig(model="gpt-5-mini"))
-
-        # Sync chat
-        output = client.chat(ChatInput(messages=[...]))
 
         # Async chat
         output = await client.chat_async(ChatInput(messages=[...]))
@@ -48,38 +44,12 @@ class OAI:
             api_key: OpenAI API key (defaults to OPENAI_API_KEY env var)
         """
         self._config = config or OAIConfig()
-        self._sync_client = OpenAI(api_key=api_key)
         self._async_client = AsyncOpenAI(api_key=api_key)
 
     @property
     def config(self) -> OAIConfig:
         """Current default configuration."""
         return self._config
-
-    def chat(
-        self,
-        input: ChatInput,
-        config: OAIConfig | None = None,
-        include_raw: bool = False,
-    ) -> ChatOutput:
-        """
-        Synchronous chat completion.
-
-        Args:
-            input: Structured chat input
-            config: Optional config override for this call
-            include_raw: Whether to include raw API response
-
-        Returns:
-            Structured chat output
-        """
-        effective_config = config or self._config
-        return sync_chat(
-            client=self._sync_client,
-            config=effective_config,
-            input=input,
-            include_raw=include_raw,
-        )
 
     async def chat_async(
         self,

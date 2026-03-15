@@ -92,12 +92,11 @@ def _format_user_message(messages: list[Message], previous_context: str | None =
     """
     parts = []
 
-    parts.append("=== USER REQUEST ===")
+    # Include full conversation
+    parts.append("=== CONVERSATION ===")
     for msg in messages:
-        if msg.role == "user":
-            parts.append(msg.content)
-        elif msg.role == "assistant":
-            parts.append(f"[Previous Assistant Response]: {msg.content}")
+        role = "User" if msg.role == "user" else "Assistant"
+        parts.append(f"{role}: {msg.content}")
 
     if previous_context:
         parts.append("\n=== PREVIOUS SEARCH FINDINGS ===")

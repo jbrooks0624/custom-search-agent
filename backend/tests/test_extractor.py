@@ -1,13 +1,12 @@
+import asyncio
+
 import pytest
 
 from oai import OAI, OAIConfig
-from tvly import SearchInput, Tavily, TavilyConfig
 from workflow import (
     ExtractedContent,
     extract,
-    extract_multiple,
     format_extracted_content,
-    get_extraction_stats,
     scrub_markdown,
 )
 
@@ -116,7 +115,9 @@ async def test_extract_multiple_contents(client: OAI):
     query = "What is machine learning?"
     contents = [SAMPLE_ML_CONTENT, IRRELEVANT_CONTENT, SAMPLE_ML_CONTENT]
 
-    results = await extract_multiple(client, contents, query)
+    tasks = [extract(client, content, query) for content in contents]
+    results_with_output = await asyncio.gather(*tasks)
+    results = [r for r, _ in results_with_output]
 
     assert len(results) == 3
     assert results[0].relevant is True  # ML content
@@ -136,7 +137,9 @@ async def test_format_extracted_content(client: OAI):
     query = "What is machine learning?"
     contents = [SAMPLE_ML_CONTENT, IRRELEVANT_CONTENT]
 
-    results = await extract_multiple(client, contents, query)
+    tasks = [extract(client, content, query) for content in contents]
+    results_with_output = await asyncio.gather(*tasks)
+    results = [r for r, _ in results_with_output]
     formatted = format_extracted_content(results)
 
     assert len(formatted) > 0
@@ -145,71 +148,3 @@ async def test_format_extracted_content(client: OAI):
     print("\n--- Formatted Extraction ---")
     print(f"Formatted output ({len(formatted)} chars):")
     print(formatted)
-
-
-@pytest.mark.asyncio
-async def test_extraction_stats(client: OAI):
-    """Test extraction statistics."""
-    query = "What is machine learning?"
-    contents = [SAMPLE_ML_CONTENT, SAMPLE_ML_CONTENT]
-
-    results = await extract_multiple(client, contents, query)
-    stats = get_extraction_stats(contents, results)
-
-    assert stats["sources_processed"] == 2
-    assert stats["sources_relevant"] == 2
-    assert stats["total_facts"] > 0
-    assert stats["reduction_percent"] > 0
-
-    print("\n--- Extraction Stats ---")
-    print(f"Original: {stats['original_chars']} chars")
-    print(f"Extracted: {stats['extracted_chars']} chars")
-    print(f"Reduction: {stats['reduction_percent']}%")
-    print(f"Sources relevant: {stats['sources_relevant']}/{stats['sources_processed']}")
-    print(f"Total facts: {stats['total_facts']}")
-
-
-@pytest.mark.asyncio
-async def test_full_pipeline_scrub_then_extract():
-    """Test the full pipeline: raw content -> scrub -> extract."""
-    # Get real search results
-    tavily = Tavily(config=TavilyConfig(max_results=2, include_raw_content="markdown"))
-    oai = OAI(config=OAIConfig(model="gpt-5-nano"))
-
-    query = "What is retrieval augmented generation RAG?"
-    search_input = SearchInput(query=query)
-    search_output = await tavily.search_async(search_input)
-
-    # Step 1: Scrub raw content
-    raw_contents = [r.raw_content for r in search_output.results if r.raw_content]
-    scrubbed_contents = [scrub_markdown(c, max_chars=4000) for c in raw_contents]
-
-    # Step 2: Extract relevant facts
-    extractions = await extract_multiple(oai, scrubbed_contents, query)
-
-    # Step 3: Format for summarizer
-    formatted = format_extracted_content(extractions)
-
-    print("\n--- Full Pipeline: Scrub → Extract ---")
-    print(f"Query: {query}")
-    print(f"Sources: {len(raw_contents)}")
-
-    total_raw = sum(len(c) for c in raw_contents)
-    total_scrubbed = sum(len(c) for c in scrubbed_contents)
-    total_extracted = len(formatted)
-
-    print("\nCompression:")
-    print(f"  Raw:       {total_raw:,} chars")
-    print(
-        f"  Scrubbed:  {total_scrubbed:,} chars ({100 - total_scrubbed / total_raw * 100:.1f}% reduction)"
-    )
-    print(
-        f"  Extracted: {total_extracted:,} chars ({100 - total_extracted / total_raw * 100:.1f}% total reduction)"
-    )
-
-    print("\nExtracted facts preview:")
-    lines = formatted.split("\n")[:10]
-    for line in lines:
-        print(f"  {line}")
-    if len(formatted.split("\n")) > 10:
-        print(f"  ... and {len(formatted.split(chr(10))) - 10} more facts")

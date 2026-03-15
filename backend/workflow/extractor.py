@@ -71,30 +71,6 @@ Extract only the facts relevant to answering the user's query."""
     return result, output
 
 
-async def extract_multiple(
-    client: OAI,
-    contents: list[str],
-    query: str,
-) -> list[ExtractedContent]:
-    """
-    Extract relevant facts from multiple scrubbed contents concurrently.
-
-    Args:
-        client: OAI client instance
-        contents: List of scrubbed markdown contents
-        query: The user's original query
-
-    Returns:
-        List of ExtractedContent results
-    """
-    import asyncio
-
-    tasks = [extract(client, content, query) for content in contents]
-    results = await asyncio.gather(*tasks)
-
-    return [result for result, _ in results]
-
-
 def format_extracted_content(extractions: list[ExtractedContent]) -> str:
     """
     Format multiple extracted contents into a single markdown string.
@@ -114,41 +90,4 @@ def format_extracted_content(extractions: list[ExtractedContent]) -> str:
     if not all_facts:
         return ""
 
-    # Format as bullet points
     return "\n".join(f"- {fact}" for fact in all_facts)
-
-
-def get_extraction_stats(
-    original_contents: list[str],
-    extractions: list[ExtractedContent],
-) -> dict:
-    """
-    Get statistics about the extraction process.
-
-    Args:
-        original_contents: Original scrubbed contents
-        extractions: Extracted contents
-
-    Returns:
-        Dictionary with stats
-    """
-    original_chars = sum(len(c) for c in original_contents)
-
-    formatted = format_extracted_content(extractions)
-    extracted_chars = len(formatted)
-
-    relevant_count = sum(1 for e in extractions if e.relevant)
-    total_facts = sum(len(e.facts) for e in extractions)
-
-    reduction = original_chars - extracted_chars
-    reduction_pct = (reduction / original_chars * 100) if original_chars > 0 else 0
-
-    return {
-        "original_chars": original_chars,
-        "extracted_chars": extracted_chars,
-        "reduction_chars": reduction,
-        "reduction_percent": round(reduction_pct, 1),
-        "sources_processed": len(extractions),
-        "sources_relevant": relevant_count,
-        "total_facts": total_facts,
-    }

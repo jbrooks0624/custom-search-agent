@@ -1,7 +1,7 @@
 """
 TVLY - A structured wrapper around the Tavily Search API.
 
-Provides clean, type-safe interfaces for web search with
+Provides clean, type-safe interfaces for async web search with
 Pydantic-based input/output handling.
 
 Example:
@@ -9,7 +9,7 @@ Example:
 
     client = Tavily(config=TavilyConfig(max_results=5))
 
-    output = client.search(SearchInput(query="What is RAG?"))
+    output = await client.search_async(SearchInput(query="What is RAG?"))
 
     print(f"Found {len(output.results)} results")
     for result in output.results:

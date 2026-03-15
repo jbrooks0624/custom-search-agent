@@ -6,7 +6,7 @@ import { DeepResearchIcon, SendIcon, NewChatIcon } from './components/Icons'
 import { useChat } from './hooks/useChat'
 import { MAX_HEIGHT } from './constants'
 import './styles/global.css'
-import './components/ChatInput/ChatInput.css'
+import './styles/ChatInput.css'
 
 function App() {
   const [input, setInput] = useState('')
