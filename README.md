@@ -150,6 +150,11 @@ Health check endpoint.
 └── README.md
 ```
 
+## Possible Next Steps
+
+- **Chat history** — Persist and surface past conversations so users can revisit threads, continue a topic, or pick up where they left off. Backend could store sessions by user/session ID; frontend could show a sidebar or list of recent chats.
+- **Caching** — Cache Tavily results or summarizer output for similar/repeated queries (e.g. by query hash or embedding similarity) to cut API cost and latency for common questions.
+
 ## Testing
 
 ```bash
