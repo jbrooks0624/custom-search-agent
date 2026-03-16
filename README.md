@@ -117,6 +117,7 @@ Health check endpoint.
 ```
 ├── backend/
 │   ├── app.py              # FastAPI application & endpoints
+|   ├── dockerfile          # Backend dockerfile
 │   ├── oai/                # OpenAI API wrapper
 │   │   ├── client.py       # OAI client class
 │   │   ├── config.py       # Model configs (gpt-5-nano, gpt-5-mini, etc.)
@@ -130,7 +131,7 @@ Health check endpoint.
 │   │   ├── main.py         # Pipeline entry points
 │   │   ├── orchestrator.py # Query generation
 │   │   ├── search.py       # Search execution
-│   │   ├── scrubber.py     # Content cleaning
+│   │   ├── scrubber.py     # Content
 │   │   ├── extractor.py    # Fact extraction
 │   │   └── summarizer.py   # Answer synthesis
 │   └── tests/              # Test suite
@@ -143,7 +144,9 @@ Health check endpoint.
 │   │   ├── components/     # React components
 │   │   ├── hooks/          # Custom hooks (useChat)
 │   │   └── api/            # API client
+|   ├── dockerfile          # Frontend dockerfile
 │   └── ...
+└── docker-compose.yml
 └── README.md
 ```
 
